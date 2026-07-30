@@ -950,7 +950,7 @@
     ]
   },
   "packageFolders": {
-    "C:\\Users\\palag\\.nuget\\packages\\": {},
+    "C:\\Users\\palag\\AppData\\Local\\Temp\\cursor-sandbox-cache\\9c2ebc6d86d9f3bf3acadbbc9f249995\\nuget": {},
     "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages": {}
   },
   "project": {
@@ -959,7 +959,7 @@
       "projectUniqueName": "D:\\Projects\\dcf2sf2\\DcfToSf2.Tests\\DcfToSf2.Tests.csproj",
       "projectName": "DcfToSf2.Tests",
       "projectPath": "D:\\Projects\\dcf2sf2\\DcfToSf2.Tests\\DcfToSf2.Tests.csproj",
-      "packagesPath": "C:\\Users\\palag\\.nuget\\packages\\",
+      "packagesPath": "C:\\Users\\palag\\AppData\\Local\\Temp\\cursor-sandbox-cache\\9c2ebc6d86d9f3bf3acadbbc9f249995\\nuget",
       "outputPath": "D:\\Projects\\dcf2sf2\\DcfToSf2.Tests\\obj\\",
       "projectStyle": "PackageReference",
       "fallbackFolders": [

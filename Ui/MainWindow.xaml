@@ -67,11 +67,22 @@
                    VerticalAlignment="Center"
                    Margin="0,0,8,12" />
         <TextBox x:Name="IgnoreFieldsBox"
-                 Grid.Row="4" Grid.Column="1" Grid.ColumnSpan="2"
-                 Margin="0,0,0,12"
+                 Grid.Row="4" Grid.Column="1"
+                 Margin="0,0,8,12"
+                 IsReadOnly="True"
                  VerticalContentAlignment="Center"
-                 ToolTip="Суффиксы через запятую, напр. Fax,Telex" />
-
+                 ToolTip="Выбранные поля и шаблоны" />
+        <StackPanel Grid.Row="4" Grid.Column="2"
+                    Margin="0,0,0,12">
+            <Button Content="Выбрать…"
+                    Padding="12,4"
+                    Margin="0,0,0,4"
+                    Click="SelectIgnoreFields_Click" />
+            <Button Content="Список…"
+                    Padding="12,4"
+                    ToolTip="Показать все поля DCF, которые будут пропущены"
+                    Click="ViewIgnoredFields_Click" />
+        </StackPanel>
         <Button x:Name="ConvertButton"
                 Grid.Row="5" Grid.Column="0" Grid.ColumnSpan="3"
                 Content="Конвертировать"

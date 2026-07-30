@@ -68,13 +68,86 @@ internal static class DcfParser
         if (IsBuiltInServiceField(elementName))
             return true;
 
-        if (ignoreFields.Count == 0)
+        return GetUserIgnoreMatch(elementName, ignoreFields) is not null;
+    }
+
+    /// <summary>
+    /// Returns the ignore-list entry that matched the field, or null if not ignored by user rules.
+    /// Built-in service fields are not reported here.
+    /// </summary>
+    public static string? GetUserIgnoreMatch(string elementName, IEnumerable<string> ignoreFields)
+    {
+        string last = GetLastToken(elementName);
+        foreach (var entry in ignoreFields)
+        {
+            if (string.IsNullOrWhiteSpace(entry))
+                continue;
+
+            if (entry.Equals(elementName, StringComparison.OrdinalIgnoreCase))
+                return entry;
+
+            if (entry.Equals(last, StringComparison.OrdinalIgnoreCase))
+                return entry;
+
+            if (IsIgnorePattern(entry) && MatchesIgnorePattern(entry, elementName))
+                return entry;
+        }
+
+        return null;
+    }
+
+    /// <summary>
+    /// Wildcard (* ?) or /regex/ pattern used in --ignore-fields / UI.
+    /// Example: *Fax matches Carrier_Fax, Seller_Fax.
+    /// </summary>
+    public static bool IsIgnorePattern(string entry)
+    {
+        if (string.IsNullOrWhiteSpace(entry))
             return false;
 
-        if (ignoreFields.Contains(elementName))
+        if (entry.Length >= 2 && entry[0] == '/' && entry[^1] == '/')
             return true;
 
-        return ignoreFields.Contains(GetLastToken(elementName));
+        return entry.IndexOfAny(['*', '?']) >= 0;
+    }
+
+    public static bool MatchesIgnorePattern(string pattern, string value)
+    {
+        if (string.IsNullOrEmpty(value) || string.IsNullOrWhiteSpace(pattern))
+            return false;
+
+        try
+        {
+            string regex = ToIgnoreRegex(pattern);
+            return Regex.IsMatch(value, regex, RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
+        }
+        catch (ArgumentException)
+        {
+            return false;
+        }
+    }
+
+    private static string ToIgnoreRegex(string pattern)
+    {
+        if (pattern.Length >= 2 && pattern[0] == '/' && pattern[^1] == '/')
+            return pattern[1..^1];
+
+        // Glob: * → .*, ? → .
+        var sb = new StringBuilder("^");
+        foreach (char c in pattern)
+        {
+            sb.Append(
+                c switch
+                {
+                    '*' => ".*",
+                    '?' => ".",
+                    _ => Regex.Escape(c.ToString()),
+                }
+            );
+        }
+
+        sb.Append('$');
+        return sb.ToString();
     }
 
     public static string GetLastToken(string elementName)

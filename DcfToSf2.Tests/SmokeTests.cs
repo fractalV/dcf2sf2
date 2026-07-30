@@ -161,6 +161,20 @@ public class SmokeTests
     }
 
     [Fact]
+    public void IgnoreFields_WildcardAndRegex()
+    {
+        var ignore = ConversionOptions.ParseIgnoreFields("*Fax,/.*Telex$/");
+
+        Assert.True(DcfParser.ShouldSkipField("Carrier_Fax", ignore));
+        Assert.True(DcfParser.ShouldSkipField("Seller_OrganizationFax", ignore));
+        Assert.True(DcfParser.ShouldSkipField("Carrier_Telex", ignore));
+        Assert.False(DcfParser.ShouldSkipField("Carrier_Phone", ignore));
+        Assert.True(DcfParser.IsIgnorePattern("*Fax"));
+        Assert.True(DcfParser.IsIgnorePattern("/abc/"));
+        Assert.False(DcfParser.IsIgnorePattern("Carrier_Fax"));
+    }
+
+    [Fact]
     public void Parser_ValidatesNesting()
     {
         string bad =
