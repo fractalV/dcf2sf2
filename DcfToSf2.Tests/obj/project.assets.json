@@ -1,7 +1,7 @@
 {
   "version": 4,
   "targets": {
-    "net10.0": {
+    "net10.0-windows": {
       "Microsoft.CodeCoverage/17.12.0": {
         "type": "package",
         "compile": {
@@ -294,56 +294,56 @@
           }
         }
       },
-      "System.CommandLine/2.0.0-beta4.22272.1": {
+      "System.CommandLine/2.0.10": {
         "type": "package",
         "compile": {
-          "lib/net6.0/System.CommandLine.dll": {
+          "lib/net8.0/System.CommandLine.dll": {
             "related": ".pdb;.xml"
           }
         },
         "runtime": {
-          "lib/net6.0/System.CommandLine.dll": {
+          "lib/net8.0/System.CommandLine.dll": {
             "related": ".pdb;.xml"
           }
         },
         "resource": {
-          "lib/net6.0/cs/System.CommandLine.resources.dll": {
+          "lib/net8.0/cs/System.CommandLine.resources.dll": {
             "locale": "cs"
           },
-          "lib/net6.0/de/System.CommandLine.resources.dll": {
+          "lib/net8.0/de/System.CommandLine.resources.dll": {
             "locale": "de"
           },
-          "lib/net6.0/es/System.CommandLine.resources.dll": {
+          "lib/net8.0/es/System.CommandLine.resources.dll": {
             "locale": "es"
           },
-          "lib/net6.0/fr/System.CommandLine.resources.dll": {
+          "lib/net8.0/fr/System.CommandLine.resources.dll": {
             "locale": "fr"
           },
-          "lib/net6.0/it/System.CommandLine.resources.dll": {
+          "lib/net8.0/it/System.CommandLine.resources.dll": {
             "locale": "it"
           },
-          "lib/net6.0/ja/System.CommandLine.resources.dll": {
+          "lib/net8.0/ja/System.CommandLine.resources.dll": {
             "locale": "ja"
           },
-          "lib/net6.0/ko/System.CommandLine.resources.dll": {
+          "lib/net8.0/ko/System.CommandLine.resources.dll": {
             "locale": "ko"
           },
-          "lib/net6.0/pl/System.CommandLine.resources.dll": {
+          "lib/net8.0/pl/System.CommandLine.resources.dll": {
             "locale": "pl"
           },
-          "lib/net6.0/pt-BR/System.CommandLine.resources.dll": {
+          "lib/net8.0/pt-BR/System.CommandLine.resources.dll": {
             "locale": "pt-BR"
           },
-          "lib/net6.0/ru/System.CommandLine.resources.dll": {
+          "lib/net8.0/ru/System.CommandLine.resources.dll": {
             "locale": "ru"
           },
-          "lib/net6.0/tr/System.CommandLine.resources.dll": {
+          "lib/net8.0/tr/System.CommandLine.resources.dll": {
             "locale": "tr"
           },
-          "lib/net6.0/zh-Hans/System.CommandLine.resources.dll": {
+          "lib/net8.0/zh-Hans/System.CommandLine.resources.dll": {
             "locale": "zh-Hans"
           },
-          "lib/net6.0/zh-Hant/System.CommandLine.resources.dll": {
+          "lib/net8.0/zh-Hant/System.CommandLine.resources.dll": {
             "locale": "zh-Hant"
           }
         }
@@ -448,14 +448,17 @@
         "type": "project",
         "framework": ".NETCoreApp,Version=v10.0",
         "dependencies": {
-          "System.CommandLine": "2.0.0-beta4.22272.1"
+          "System.CommandLine": "2.0.10"
         },
         "compile": {
           "bin/placeholder/DcfToSf2.dll": {}
         },
         "runtime": {
           "bin/placeholder/DcfToSf2.dll": {}
-        }
+        },
+        "frameworkReferences": [
+          "Microsoft.WindowsDesktop.App.WPF"
+        ]
       }
     }
   },
@@ -743,30 +746,31 @@
         "packageIcon.png"
       ]
     },
-    "System.CommandLine/2.0.0-beta4.22272.1": {
-      "sha512": "1uqED/q2H0kKoLJ4+hI2iPSBSEdTuhfCYADeJrAqERmiGQ2NNacYKRNEQ+gFbU4glgVyK8rxI+ZOe1onEtr/Pg==",
+    "System.CommandLine/2.0.10": {
+      "sha512": "6i1D6/U3i1f/PiXTt9pDvbJwdXEe0F2DZPup6BHzeIu5yPk/lkFzgtrJnPbj54JWUh8Y9vJeKG/TZIT6MkF8TA==",
       "type": "package",
-      "path": "system.commandline/2.0.0-beta4.22272.1",
+      "path": "system.commandline/2.0.10",
       "files": [
         ".nupkg.metadata",
         ".signature.p7s",
         "Icon.png",
-        "lib/net6.0/System.CommandLine.dll",
-        "lib/net6.0/System.CommandLine.pdb",
-        "lib/net6.0/System.CommandLine.xml",
-        "lib/net6.0/cs/System.CommandLine.resources.dll",
-        "lib/net6.0/de/System.CommandLine.resources.dll",
-        "lib/net6.0/es/System.CommandLine.resources.dll",
-        "lib/net6.0/fr/System.CommandLine.resources.dll",
-        "lib/net6.0/it/System.CommandLine.resources.dll",
-        "lib/net6.0/ja/System.CommandLine.resources.dll",
-        "lib/net6.0/ko/System.CommandLine.resources.dll",
-        "lib/net6.0/pl/System.CommandLine.resources.dll",
-        "lib/net6.0/pt-BR/System.CommandLine.resources.dll",
-        "lib/net6.0/ru/System.CommandLine.resources.dll",
-        "lib/net6.0/tr/System.CommandLine.resources.dll",
-        "lib/net6.0/zh-Hans/System.CommandLine.resources.dll",
-        "lib/net6.0/zh-Hant/System.CommandLine.resources.dll",
+        "README.md",
+        "lib/net8.0/System.CommandLine.dll",
+        "lib/net8.0/System.CommandLine.pdb",
+        "lib/net8.0/System.CommandLine.xml",
+        "lib/net8.0/cs/System.CommandLine.resources.dll",
+        "lib/net8.0/de/System.CommandLine.resources.dll",
+        "lib/net8.0/es/System.CommandLine.resources.dll",
+        "lib/net8.0/fr/System.CommandLine.resources.dll",
+        "lib/net8.0/it/System.CommandLine.resources.dll",
+        "lib/net8.0/ja/System.CommandLine.resources.dll",
+        "lib/net8.0/ko/System.CommandLine.resources.dll",
+        "lib/net8.0/pl/System.CommandLine.resources.dll",
+        "lib/net8.0/pt-BR/System.CommandLine.resources.dll",
+        "lib/net8.0/ru/System.CommandLine.resources.dll",
+        "lib/net8.0/tr/System.CommandLine.resources.dll",
+        "lib/net8.0/zh-Hans/System.CommandLine.resources.dll",
+        "lib/net8.0/zh-Hant/System.CommandLine.resources.dll",
         "lib/netstandard2.0/System.CommandLine.dll",
         "lib/netstandard2.0/System.CommandLine.pdb",
         "lib/netstandard2.0/System.CommandLine.xml",
@@ -783,7 +787,7 @@
         "lib/netstandard2.0/tr/System.CommandLine.resources.dll",
         "lib/netstandard2.0/zh-Hans/System.CommandLine.resources.dll",
         "lib/netstandard2.0/zh-Hant/System.CommandLine.resources.dll",
-        "system.commandline.2.0.0-beta4.22272.1.nupkg.sha512",
+        "system.commandline.2.0.10.nupkg.sha512",
         "system.commandline.nuspec"
       ]
     },
@@ -938,7 +942,7 @@
     }
   },
   "projectFileDependencyGroups": {
-    "net10.0": [
+    "net10.0-windows": [
       "DcfToSf2 >= 1.0.0",
       "Microsoft.NET.Test.Sdk >= 17.12.0",
       "xunit >= 2.9.2",
@@ -946,7 +950,7 @@
     ]
   },
   "packageFolders": {
-    "C:\\Users\\palag\\AppData\\Local\\Temp\\cursor-sandbox-cache\\be931ee669cf404b2293ec1356af80be\\nuget": {},
+    "C:\\Users\\palag\\.nuget\\packages\\": {},
     "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages": {}
   },
   "project": {
@@ -955,7 +959,7 @@
       "projectUniqueName": "D:\\Projects\\dcf2sf2\\DcfToSf2.Tests\\DcfToSf2.Tests.csproj",
       "projectName": "DcfToSf2.Tests",
       "projectPath": "D:\\Projects\\dcf2sf2\\DcfToSf2.Tests\\DcfToSf2.Tests.csproj",
-      "packagesPath": "C:\\Users\\palag\\AppData\\Local\\Temp\\cursor-sandbox-cache\\be931ee669cf404b2293ec1356af80be\\nuget",
+      "packagesPath": "C:\\Users\\palag\\.nuget\\packages\\",
       "outputPath": "D:\\Projects\\dcf2sf2\\DcfToSf2.Tests\\obj\\",
       "projectStyle": "PackageReference",
       "fallbackFolders": [
@@ -967,7 +971,7 @@
         "C:\\Program Files (x86)\\NuGet\\Config\\Microsoft.VisualStudio.Offline.config"
       ],
       "originalTargetFrameworks": [
-        "net10.0"
+        "net10.0-windows"
       ],
       "sources": {
         "C:\\Program Files (x86)\\Microsoft SDKs\\NuGetPackages\\": {},
@@ -975,9 +979,9 @@
         "https://api.nuget.org/v3/index.json": {}
       },
       "frameworks": {
-        "net10.0": {
-          "framework": "net10.0",
-          "targetAlias": "net10.0",
+        "net10.0-windows": {
+          "framework": "net10.0-windows7.0",
+          "targetAlias": "net10.0-windows",
           "projectReferences": {
             "D:\\Projects\\dcf2sf2\\DcfToSf2.csproj": {
               "projectPath": "D:\\Projects\\dcf2sf2\\DcfToSf2.csproj"
@@ -998,9 +1002,9 @@
       "SdkAnalysisLevel": "10.0.300"
     },
     "frameworks": {
-      "net10.0": {
-        "framework": "net10.0",
-        "targetAlias": "net10.0",
+      "net10.0-windows": {
+        "framework": "net10.0-windows7.0",
+        "targetAlias": "net10.0-windows",
         "dependencies": {
           "Microsoft.NET.Test.Sdk": {
             "target": "Package",

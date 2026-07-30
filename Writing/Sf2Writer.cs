@@ -1,4 +1,5 @@
 using System.Text;
+using DcfToSf2.Diagnostics;
 using DcfToSf2.Layout;
 
 namespace DcfToSf2.Writing;
@@ -8,8 +9,13 @@ internal static class Sf2Writer
     public static string GetPath(DirectoryInfo outputDirectory, string documentName) =>
         Path.Combine(outputDirectory.FullName, $"{documentName}.sf2");
 
-    public static void Write(DirectoryInfo outputDirectory, Sf2Document document)
+    public static void Write(
+        DirectoryInfo outputDirectory,
+        Sf2Document document,
+        IConversionLog? log = null
+    )
     {
+        log ??= ConsoleConversionLog.Instance;
         Directory.CreateDirectory(outputDirectory.FullName);
         string path = GetPath(outputDirectory, document.DocumentName);
         var lines = Render(document);
@@ -17,9 +23,7 @@ internal static class Sf2Writer
         foreach (var line in lines)
             sw.WriteLine(line);
 
-        Console.ForegroundColor = ConsoleColor.Green;
-        Console.WriteLine("Файл записан: " + path);
-        Console.ResetColor();
+        log.Success("Файл записан: " + path);
     }
 
     public static List<string> Render(Sf2Document document)

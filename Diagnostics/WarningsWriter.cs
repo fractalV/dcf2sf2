@@ -7,8 +7,14 @@ internal static class WarningsWriter
     public static string GetWarningsPath(DirectoryInfo outputDirectory, string documentName) =>
         Path.Combine(outputDirectory.FullName, $"{documentName}.dcf.warnings.txt");
 
-    public static void Write(DirectoryInfo outputDirectory, string documentName, DcfDiagnostics diagnostics)
+    public static void Write(
+        DirectoryInfo outputDirectory,
+        string documentName,
+        DcfDiagnostics diagnostics,
+        IConversionLog? log = null
+    )
     {
+        log ??= ConsoleConversionLog.Instance;
         string path = GetWarningsPath(outputDirectory, documentName);
 
         if (!diagnostics.HasAny)
@@ -28,10 +34,11 @@ internal static class WarningsWriter
 
         File.WriteAllText(path, sb.ToString(), Encoding.UTF8);
 
-        Console.ForegroundColor = diagnostics.HasErrors ? ConsoleColor.Red : ConsoleColor.Yellow;
-        Console.WriteLine(
-            $"Diagnostics: errors={diagnostics.ErrorCount} warnings={diagnostics.WarningCount} → {path}"
-        );
-        Console.ResetColor();
+        string message =
+            $"Diagnostics: errors={diagnostics.ErrorCount} warnings={diagnostics.WarningCount} → {path}";
+        if (diagnostics.HasErrors)
+            log.Error(message);
+        else
+            log.Warning(message);
     }
 }
