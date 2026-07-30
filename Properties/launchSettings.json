@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "DcfToSf2": {
+      "commandName": "Project",
+      "commandLineArgs": "-f d:\\Alta\\data\\ed\\5_27_1\\BILLOFLADING.XSD.Dcf -o d:\\Alta\\data\\ed\\5_27_1\\_generated --force-list"
+    }
+  }
+}

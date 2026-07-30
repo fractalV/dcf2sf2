@@ -1,0 +1,23 @@
+{
+  "version": 2,
+  "dgSpecHash": "QqHh4JlPD/Q=",
+  "success": true,
+  "projectFilePath": "D:\\Projects\\dcf2sf2\\DcfToSf2.Tests\\DcfToSf2.Tests.csproj",
+  "expectedPackageFiles": [
+    "C:\\Users\\palag\\AppData\\Local\\Temp\\cursor-sandbox-cache\\be931ee669cf404b2293ec1356af80be\\nuget\\microsoft.codecoverage\\17.12.0\\microsoft.codecoverage.17.12.0.nupkg.sha512",
+    "C:\\Users\\palag\\AppData\\Local\\Temp\\cursor-sandbox-cache\\be931ee669cf404b2293ec1356af80be\\nuget\\microsoft.net.test.sdk\\17.12.0\\microsoft.net.test.sdk.17.12.0.nupkg.sha512",
+    "C:\\Users\\palag\\AppData\\Local\\Temp\\cursor-sandbox-cache\\be931ee669cf404b2293ec1356af80be\\nuget\\microsoft.testplatform.objectmodel\\17.12.0\\microsoft.testplatform.objectmodel.17.12.0.nupkg.sha512",
+    "C:\\Users\\palag\\AppData\\Local\\Temp\\cursor-sandbox-cache\\be931ee669cf404b2293ec1356af80be\\nuget\\microsoft.testplatform.testhost\\17.12.0\\microsoft.testplatform.testhost.17.12.0.nupkg.sha512",
+    "C:\\Users\\palag\\AppData\\Local\\Temp\\cursor-sandbox-cache\\be931ee669cf404b2293ec1356af80be\\nuget\\newtonsoft.json\\13.0.1\\newtonsoft.json.13.0.1.nupkg.sha512",
+    "C:\\Users\\palag\\AppData\\Local\\Temp\\cursor-sandbox-cache\\be931ee669cf404b2293ec1356af80be\\nuget\\system.commandline\\2.0.0-beta4.22272.1\\system.commandline.2.0.0-beta4.22272.1.nupkg.sha512",
+    "C:\\Users\\palag\\AppData\\Local\\Temp\\cursor-sandbox-cache\\be931ee669cf404b2293ec1356af80be\\nuget\\xunit\\2.9.2\\xunit.2.9.2.nupkg.sha512",
+    "C:\\Users\\palag\\AppData\\Local\\Temp\\cursor-sandbox-cache\\be931ee669cf404b2293ec1356af80be\\nuget\\xunit.abstractions\\2.0.3\\xunit.abstractions.2.0.3.nupkg.sha512",
+    "C:\\Users\\palag\\AppData\\Local\\Temp\\cursor-sandbox-cache\\be931ee669cf404b2293ec1356af80be\\nuget\\xunit.analyzers\\1.16.0\\xunit.analyzers.1.16.0.nupkg.sha512",
+    "C:\\Users\\palag\\AppData\\Local\\Temp\\cursor-sandbox-cache\\be931ee669cf404b2293ec1356af80be\\nuget\\xunit.assert\\2.9.2\\xunit.assert.2.9.2.nupkg.sha512",
+    "C:\\Users\\palag\\AppData\\Local\\Temp\\cursor-sandbox-cache\\be931ee669cf404b2293ec1356af80be\\nuget\\xunit.core\\2.9.2\\xunit.core.2.9.2.nupkg.sha512",
+    "C:\\Users\\palag\\AppData\\Local\\Temp\\cursor-sandbox-cache\\be931ee669cf404b2293ec1356af80be\\nuget\\xunit.extensibility.core\\2.9.2\\xunit.extensibility.core.2.9.2.nupkg.sha512",
+    "C:\\Users\\palag\\AppData\\Local\\Temp\\cursor-sandbox-cache\\be931ee669cf404b2293ec1356af80be\\nuget\\xunit.extensibility.execution\\2.9.2\\xunit.extensibility.execution.2.9.2.nupkg.sha512",
+    "C:\\Users\\palag\\AppData\\Local\\Temp\\cursor-sandbox-cache\\be931ee669cf404b2293ec1356af80be\\nuget\\xunit.runner.visualstudio\\2.8.2\\xunit.runner.visualstudio.2.8.2.nupkg.sha512"
+  ],
+  "logs": []
+}

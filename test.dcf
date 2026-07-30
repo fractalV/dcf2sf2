@@ -1,0 +1,333 @@
+[Test.Header]
+DocFileLabel=       tst
+DocFileExt=         tstp
+FullName=           Тестовый документ
+ShortName=          ТестДок
+KeyField=           Num
+DateField=          DateImport
+MainBlock=          Goods
+RegNum=             RegNum
+[Test.Fields]
+DocumentID=C36  |* Уникальный идентификатор документа NAMESPACE="cat_ru:DocumentID"
+RefDocumentID=C36  |Уникальный идентификатор исходного документа NAMESPACE="cat_ru:RefDocumentID"
+INNSign=C12  |ИНН владельца МЧД PATTERN=".{10,12}" NAMESPACE="cat_ru:INNSign"
+MCD_ID=C36  |Единый регистрационный номер доверенности в формате МЧД NAMESPACE="cat_ru:MCD_ID"
+DocumentNumber=C50  |Номер документа NAMESPACE="NOP"
+RegNum=C25   |Регистрационный номер NAMESPACE="NOP"
+Customs=B |* Сведения о таможенном органе NAMESPACE="Customs"
+Customs_Code=C8  |* Код таможенного органа PATTERN="[0-9]{2}|[0-9]{5}|[0-9]{8}" NAMESPACE="Customs#cat_ru:Code" PRNT="1"
+Customs_OfficeName=C50  |Наименование таможенного органа NAMESPACE="Customs#cat_ru:OfficeName"
+Resident=B |* Сведения о резиденте СТЗ NAMESPACE="Resident"
+Resident_OrganizationName=C150  |Наименование организации / ФИО физического лица NAMESPACE="Resident#cat_ru:OrganizationName" PRNT="1"
+Resident_ShortName=C120  |Краткое наименование организации NAMESPACE="Resident#cat_ru:ShortName"
+Resident_OrganizationLanguage=C2  |Код языка для заполнения наименования PATTERN="[A-Z]{2}" NAMESPACE="Resident#cat_ru:OrganizationLanguage"
+Resident_RFOrganizationFeatures=B |* Сведения об организации. Особенности Российской Федерации NAMESPACE="Resident#cat_ru:RFOrganizationFeatures"
+Resident_RFOrganizationFeatures_OGRN=C15  |ОГРН/ОГРНИП. Основной государственный регистрационный номер PATTERN="(\d{15})|(\d{13})" NAMESPACE="Resident#cat_ru:RFOrganizationFeatures#cat_ru:OGRN" CHOICE="1"
+Resident_RFOrganizationFeatures_INN=C12  |ИНН - Индивидуальный номер налогоплательщика PATTERN=".{10,12}" NAMESPACE="Resident#cat_ru:RFOrganizationFeatures#cat_ru:INN" CHOICE="1"
+Resident_RFOrganizationFeatures_KPP=C9  |КПП - Код причины постановки на учет PATTERN="\d{9}" NAMESPACE="Resident#cat_ru:RFOrganizationFeatures#cat_ru:KPP" CHOICE="1"
+Resident_RKOrganizationFeatures=B |* Сведения об организации. Особенности Республики Казахстан NAMESPACE="Resident#cat_ru:RKOrganizationFeatures"
+Resident_RKOrganizationFeatures_BIN=C12  |Бизнес-идентификационный номер (БИН) PATTERN="\d{12}" NAMESPACE="Resident#cat_ru:RKOrganizationFeatures#cat_ru:BIN" CHOICE="2"
+Resident_RKOrganizationFeatures_IIN=C12  |Индивидуальный идентификационный номер (ИИН) PATTERN="\d{12}" NAMESPACE="Resident#cat_ru:RKOrganizationFeatures#cat_ru:IIN" CHOICE="2"
+Resident_RKOrganizationFeatures_ITN=B |Идентификационный таможенный номер (ИТН) NAMESPACE="Resident#cat_ru:RKOrganizationFeatures#cat_ru:ITN"
+Resident_RKOrganizationFeatures_ITN_CategoryCode=C2  |! Категория лица. Двухзначный цифровой код категории лица согласно учредительным документам или свидетельству о регистрации в качестве индивидуального предпринимателя PATTERN=".{2}" NAMESPACE="Resident#cat_ru:RKOrganizationFeatures#cat_ru:ITN#cat_ru:CategoryCode" CHOICE="2"
+Resident_RKOrganizationFeatures_ITN_KATOCode=C2  |! Код КАТО. Двухзначный код КАТО в соответствии с классификатором кодов административно-территориальных объектов PATTERN=".{2}" NAMESPACE="Resident#cat_ru:RKOrganizationFeatures#cat_ru:ITN#cat_ru:KATOCode" CHOICE="2"
+Resident_RKOrganizationFeatures_ITN_RNN=C12  |РНН. Регистрационный налоговый номер, присваиваемый налоговыми органами Республики Казахстан PATTERN=".{12}" NAMESPACE="Resident#cat_ru:RKOrganizationFeatures#cat_ru:ITN#cat_ru:RNN" CHOICE="2"
+Resident_RKOrganizationFeatures_ITN_ITNReserv=C36  |Резерв для ИТН NAMESPACE="Resident#cat_ru:RKOrganizationFeatures#cat_ru:ITN#cat_ru:ITNReserv" CHOICE="2"
+Resident_RBOrganizationFeatures=B |* Сведения об организации. Особенности Республики Беларусь NAMESPACE="Resident#cat_ru:RBOrganizationFeatures"
+Resident_RBOrganizationFeatures_UNP=C9  |Учетный номер плательщика (УНП) PATTERN="\d{9}" NAMESPACE="Resident#cat_ru:RBOrganizationFeatures#cat_ru:UNP" CHOICE="3"
+Resident_RBOrganizationFeatures_RBIdentificationNumber=C14  |Идентификационный номер физического лица NAMESPACE="Resident#cat_ru:RBOrganizationFeatures#cat_ru:RBIdentificationNumber" CHOICE="3"
+Resident_RAOrganizationFeatures=B |* Сведения об организации. Особенности Республики Армения NAMESPACE="Resident#cat_ru:RAOrganizationFeatures"
+Resident_RAOrganizationFeatures_UNN=C8  |Учетный номер налогоплательщика (УНН) PATTERN="\d{8}" NAMESPACE="Resident#cat_ru:RAOrganizationFeatures#cat_ru:UNN" CHOICE="4"
+Resident_RAOrganizationFeatures_SocialServiceNumber=C10  |Номерной знак общественных услуг (НЗОУ) PATTERN="\d{10}" NAMESPACE="Resident#cat_ru:RAOrganizationFeatures#cat_ru:SocialServiceNumber" CHOICE="4"
+Resident_RAOrganizationFeatures_SocialServiceCertificate=C10  |Номер справки об отсутствии номерного знака общественных услуг (НЗОУ) PATTERN=".{10}" NAMESPACE="Resident#cat_ru:RAOrganizationFeatures#cat_ru:SocialServiceCertificate" CHOICE="4"
+Resident_KGOrganizationFeatures=B |* Сведения об организации. Особенности Кыргызской Республики NAMESPACE="Resident#cat_ru:KGOrganizationFeatures"
+Resident_KGOrganizationFeatures_KGINN=C14  |ИНН - идентификационный налоговый номер налогоплательщика, ПИН - персональный идентификационный номер PATTERN="\d{14}" NAMESPACE="Resident#cat_ru:KGOrganizationFeatures#cat_ru:KGINN" CHOICE="5"
+Resident_KGOrganizationFeatures_KGOKPO=C8  |Код Общереспубликанского классификатора предприятий и организаций (ОКПО) для юридических лиц и индивидуальных предпринимателей PATTERN="\d{8}" NAMESPACE="Resident#cat_ru:KGOrganizationFeatures#cat_ru:KGOKPO" CHOICE="5"
+Resident_CountryA2Code=C2  |Кодовое обозначение страны PATTERN="[A-Z]{2}|[0]{2}|[9]{2}" NAMESPACE="Resident#RUScat_ru:CountryA2Code"
+Resident_BusinessEntityTypeCode=B |Кодовое обозначение организационно-правовой формы, в которой зарегистрирован хозяйствующий субъект NAMESPACE="Resident#RUScat_ru:BusinessEntityTypeCode"
+Resident_BusinessEntityTypeCode_UnifiedCode=C20  |! Код объекта в соответсвии со справочником (классификатором) NAMESPACE="Resident#RUScat_ru:BusinessEntityTypeCode#RUScat_ru:UnifiedCode"
+Resident_BusinessEntityTypeCode_CodeListId=C20  |Обозначение справочника (классификатора), в соответствии с которым указан код NAMESPACE="Resident#RUScat_ru:BusinessEntityTypeCode#RUScat_ru:CodeListId"
+Resident_BusinessEntityTypeName=C300  |Наименование организационно-правовой формы, в которой зарегистрирован хозяйствующий субъект NAMESPACE="Resident#RUScat_ru:BusinessEntityTypeName"
+Resident_UITN=B |Уникальный идентификационный таможенный номер, присвоенный юридическому или физическому лицу NAMESPACE="Resident#RUScat_ru:UITN"
+Resident_UITN_UITNCode=C40  |! Код. Универсальный идентификационный таможенный номер. Строка не более 40 символов NAMESPACE="Resident#RUScat_ru:UITN#RUScat_ru:UITNCode"
+Resident_UITN_CountryCode=C2  |Кодовое обозначение страны, по правилам которой сформирован указанный идентификатор PATTERN="[A-Z]{2}|[0]{2}|[9]{2}" NAMESPACE="Resident#RUScat_ru:UITN#RUScat_ru:CountryCode"
+Resident_PersonId=C20  |Уникальный идентификатор физического лица NAMESPACE="Resident#RUScat_ru:PersonId"
+Resident_IdentityCard=B |Сведения о документе, удостоверяющем личность физического лица NAMESPACE="Resident#RUScat_ru:IdentityCard"
+Resident_IdentityCard_IdentityCardCode=C7  |Код вида документа, удостоверяющего личность, в соответствии с классификатором видов документов, удостоверяющих личность PATTERN="(\d{2})|([A-Z]{2}\d{5})" NAMESPACE="Resident#RUScat_ru:IdentityCard#RUScat_ru:IdentityCardCode"
+Resident_IdentityCard_IdentityCardName=C40  |Краткое наименование документа, удостоверяющего личность NAMESPACE="Resident#RUScat_ru:IdentityCard#RUScat_ru:IdentityCardName"
+Resident_IdentityCard_FullIdentityCardName=C250  |Полное наименование документа, удостоверяющего личность NAMESPACE="Resident#RUScat_ru:IdentityCard#RUScat_ru:FullIdentityCardName"
+Resident_IdentityCard_IdentityCardSeries=C11  |Серия документа, удостоверяющего личность NAMESPACE="Resident#RUScat_ru:IdentityCard#RUScat_ru:IdentityCardSeries"
+Resident_IdentityCard_IdentityCardNumber=C25  |Номер документа, удостоверяющего личность NAMESPACE="Resident#RUScat_ru:IdentityCard#RUScat_ru:IdentityCardNumber"
+Resident_IdentityCard_IdentityCardDate=D10  |Дата выдачи документа, удостоверяющего личность NAMESPACE="Resident#RUScat_ru:IdentityCard#RUScat_ru:IdentityCardDate"
+Resident_IdentityCard_DocValidityDate=D10  |Дата окончания срока, в течение которого документ имеет силу NAMESPACE="Resident#RUScat_ru:IdentityCard#RUScat_ru:DocValidityDate"
+Resident_IdentityCard_OrganizationName=C150  |Наименование организации, выдавшей документ NAMESPACE="Resident#RUScat_ru:IdentityCard#RUScat_ru:OrganizationName"
+Resident_IdentityCard_IssuerCode=C7  |Код подразделения органа, выдавшего документ, удостоверяющий личность NAMESPACE="Resident#RUScat_ru:IdentityCard#RUScat_ru:IssuerCode"
+Resident_IdentityCard_AuthorityId=C20  |Строка, идентифицирующая орган государственной власти государства-члена либо уполномоченную им организацию, выдавшую документ NAMESPACE="Resident#RUScat_ru:IdentityCard#RUScat_ru:AuthorityId"
+Resident_IdentityCard_CountryCode=C2  |Кодовое обозначение страны PATTERN="[A-Z]{2}|[0]{2}|[9]{2}" NAMESPACE="Resident#RUScat_ru:IdentityCard#RUScat_ru:CountryCode"
+; ====> Адрес
+Resident_SubjectAddressDetails{&&Num NAMESPACE="Resident#RUScat_ru:SubjectAddressDetails"
+AddressKindCode=C20  |Кодовое обозначение вида адреса: "1" - адрес регистрации; "2" - фактический адрес; "3" - почтовый адрес NAMESPACE="RUScat_ru:AddressKindCode"
+PostalCode=C9  |Почтовый индекс NAMESPACE="RUScat_ru:PostalCode"
+CountryCode=C2  |Буквенный код страны в соответствии с классификатором стран мира PATTERN="[A-Z]{2}|[0]{2}|[9]{2}" NAMESPACE="RUScat_ru:CountryCode"
+CounryName=C120  |Краткое название страны в соответствии с классификатором стран мира NAMESPACE="RUScat_ru:CounryName"
+Region=C120  |Регион (Наименование единицы административно-территориального деления первого уровня) NAMESPACE="RUScat_ru:Region"
+District=C120  |Район (Наименование единицы административно-территориального деления второго уровня) NAMESPACE="RUScat_ru:District"
+Town=C120  |Город NAMESPACE="RUScat_ru:Town"
+City=C120  |Населенный пункт NAMESPACE="RUScat_ru:City"
+StreetHouse=C120  |Улица (Наименование элемента улично-дорожной сети городской инфраструктуры) NAMESPACE="RUScat_ru:StreetHouse"
+House=C120  |Обозначение дома, корпуса, строения NAMESPACE="RUScat_ru:House"
+Room=C120  |Обозначение офиса или квартиры NAMESPACE="RUScat_ru:Room"
+AddressText=C1000  |Набор элементов адреса, представленных в свободной форме в виде текста. NAMESPACE="RUScat_ru:AddressText"
+OKTMO=C11  |Код ОКТМО (Общероссийский классификатор территорий муниципальных образований) NAMESPACE="RUScat_ru:OKTMO"
+OKATO=C11  |Код ОКАТО (Общероссийский классификатор объектов административно-территориального деления) PATTERN="\d{5,11}" NAMESPACE="RUScat_ru:OKATO"
+KLADR=C20  |Код КЛАДР NAMESPACE="RUScat_ru:KLADR"
+AOGUID=C36  |Глобальный идентификатор адресного объекта по ФИАС NAMESPACE="RUScat_ru:AOGUID"
+AOID=C36  |Уникальный идентификатор адресного объекта по ФИАС NAMESPACE="RUScat_ru:AOID"
+TerritoryCode=C17  |Код единицы административно-территориального деления NAMESPACE="RUScat_ru:TerritoryCode"
+PostOfficeBoxId=C20  |Номер абонентского ящика на предприятии почтовой связи NAMESPACE="RUScat_ru:PostOfficeBoxId"
+}
+Resident_CommunicationDetails=B |Контактный реквизит субъекта NAMESPACE="Resident#RUScat_ru:CommunicationDetails"
+Resident_CommunicationDetails_Phone=C250 24  |Номер телефона SEQ="2" NAMESPACE="Resident#RUScat_ru:CommunicationDetails#cat_ru:Phone"
+Resident_CommunicationDetails_Fax=C24  |Номер факса NAMESPACE="Resident#RUScat_ru:CommunicationDetails#cat_ru:Fax"
+Resident_CommunicationDetails_Telex=C24  |Номер телекса NAMESPACE="Resident#RUScat_ru:CommunicationDetails#cat_ru:Telex"
+Resident_CommunicationDetails_E_mail=C250 50  |Адрес электронной почты SEQ="1" NAMESPACE="Resident#RUScat_ru:CommunicationDetails#cat_ru:E_mail"
+Resident_ResidentCertificate=B |* Cвидетельство о включении в реестр резидентов NAMESPACE="Resident#ResidentCertificate"
+Resident_ResidentCertificate_CertificateNumber=C50  |* Номер свидетельства NAMESPACE="Resident#ResidentCertificate#CertificateNumber" PRNT="1"
+Resident_ResidentCertificate_CertificateDate=D10  |* Дата выдачи свидетельства NAMESPACE="Resident#ResidentCertificate#CertificateDate"
+Resident_ResidentCertificate_CertificateValidity=D10  |Срок действия NAMESPACE="Resident#ResidentCertificate#CertificateValidity"
+Resident_ResidentCertificate_CertificateAgency=C150  |Наименование органа, выдавшего свидетельство NAMESPACE="Resident#ResidentCertificate#CertificateAgency"
+LowArticle=N2  |* Статья Федерального закона от 13 июля 2020 г. N 193-ФЗ NAMESPACE="LowArticle" MINVAL="1"
+SheetsNumber=N3  |Количество листов NAMESPACE="SheetsNumber"
+AgreementDoc=B |* Свидетельство о выполнении условий соглашения об осуществлении инвестиционной деятельности NAMESPACE="AgreementDoc"
+AgreementDoc_AgreementNumber=C50  |! Номер документа NAMESPACE="AgreementDoc#AgreementNumber" CHOICE="1"
+AgreementDoc_AgreementSeries=C50  |Серия документа NAMESPACE="AgreementDoc#AgreementSeries" CHOICE="1"
+AgreementDoc_AgreementDate=D10  |! Дата документа NAMESPACE="AgreementDoc#AgreementDate" CHOICE="1"
+LegalAct=B |* НПА, которым определено прекращение применения таможенной процедуры СТЗ NAMESPACE="LegalAct"
+LegalAct_PrDocumentName=C250  |Наименование документа NAMESPACE="LegalAct#cat_ru:PrDocumentName" CHOICE="2"
+LegalAct_PrDocumentNumber=C50  |Номер документа NAMESPACE="LegalAct#cat_ru:PrDocumentNumber" CHOICE="2"
+LegalAct_PrDocumentDate=D10  |Дата документа NAMESPACE="LegalAct#cat_ru:PrDocumentDate" CHOICE="2"
+GoodsInfo=B |* Сведения о товарах, помещенных  под СТЗ NAMESPACE="GoodsInfo"
+; ====> Оборудование
+GoodsInfo_Equipment{&&Num NAMESPACE="GoodsInfo#Equipment"
+Position=N3  |! Порядковый номер позиции NAMESPACE="Position"
+EquipmentName=C250 250  |! Наименование оборудования SEQ="1" NAMESPACE="EquipmentName"
+EquipmentKind=C250 250  |! Вид (класс) оборудования SEQ="1" NAMESPACE="EquipmentKind"
+; ====> Реквизиты документа бухгалтерского учета, согласно которому оборудование учтено резидентом
+AccountDoc{&&Num NAMESPACE="AccountDoc" OPT="1"
+PrDocumentName=C250  |Наименование документа NAMESPACE="cat_ru:PrDocumentName"
+PrDocumentNumber=C50  |Номер документа NAMESPACE="cat_ru:PrDocumentNumber"
+PrDocumentDate=D10  |Дата документа NAMESPACE="cat_ru:PrDocumentDate"
+Position=N3  |Порядковый номер позиции NAMESPACE="catProc_ru:Position"
+GoodsNumber=N3  |Номер товара в бухгалтерском документе NAMESPACE="catProc_ru:GoodsNumber"
+; ====> Количество товара из бухгалтерского документа, вошедшего в позицию
+GoodsQuantity{&&Num NAMESPACE="catProc_ru:GoodsQuantity"
+GoodsQuantity=N24.8  |! Количество товара в единице измерения NAMESPACE="catESAD_cu:GoodsQuantity"
+MeasureUnitQualifierName=C50  |Условное обозначение единицы измерения NAMESPACE="catESAD_cu:MeasureUnitQualifierName"
+MeasureUnitQualifierCode=C4  |Код по классификатору единиц измерения и счета Евразийского экономического союза PATTERN="[0-9A-Z]{2,3}|\d{3,4}" NAMESPACE="catESAD_cu:MeasureUnitQualifierCode"
+}
+}
+CommissioningInfo=C250 250  |! Сведения о вводе оборудования в эксплуатацию SEQ="1" NAMESPACE="CommissioningInfo"
+CommissioningDate=D10  |Дата ввода в эксплуатацию NAMESPACE="CommissioningDate"
+; ====> Сведения о товаре
+EquipmentGoods{&&Num NAMESPACE="EquipmentGoods" OPT="1"
+Position=N3  |* Порядковый номер позиции NAMESPACE="Position"
+GoodsDescription=C250 250  |* Наименование товара SEQ="1" NAMESPACE="GoodsDescription"
+; ====> Сведения о ДТ
+EquipmentGoodsDecl{&&Num NAMESPACE="EquipmentGoodsDecl" OPT="1"
+CustomsCode=C8  |* Код таможенного органа, зарегистрировавшего документ PATTERN="[0-9]{2}|[0-9]{5}|[0-9]{8}" NAMESPACE="cat_ru:CustomsCode"
+RegistrationDate=D10  |* Дата регистрации документа NAMESPACE="cat_ru:RegistrationDate"
+GTDNumber=C7  |* Порядковый номер документа по журналу регистрации NAMESPACE="cat_ru:GTDNumber"
+; ====> Товары ДТ
+GoodsDeclnfo{&&Num NAMESPACE="GoodsDeclnfo" OPT="1"
+GoodsNumber=N3  |* Номер товара в ДТ NAMESPACE="GoodsNumber"
+; ====> Количество товара из ДТ, вошедшее в позицию
+GoodsQuantity{&&Num NAMESPACE="GoodsQuantity"
+GoodsQuantity=N24.8  |! Количество товара в единице измерения NAMESPACE="catESAD_cu:GoodsQuantity"
+MeasureUnitQualifierName=C50  |Условное обозначение единицы измерения NAMESPACE="catESAD_cu:MeasureUnitQualifierName"
+MeasureUnitQualifierCode=C4  |Код по классификатору единиц измерения и счета Евразийского экономического союза PATTERN="[0-9A-Z]{2,3}|\d{3,4}" NAMESPACE="catESAD_cu:MeasureUnitQualifierCode"
+}
+TechID=C250 50  |Технические идентификаторы SEQ="1" NAMESPACE="TechID"
+}
+}
+; ====> Реквизиты документа бухгалтерского учета, согласно которому товары учтены резидентом
+AccountDoc{&&Num NAMESPACE="AccountDoc"
+PrDocumentName=C250  |Наименование документа NAMESPACE="cat_ru:PrDocumentName"
+PrDocumentNumber=C50  |Номер документа NAMESPACE="cat_ru:PrDocumentNumber"
+PrDocumentDate=D10  |Дата документа NAMESPACE="cat_ru:PrDocumentDate"
+Position=N3  |Порядковый номер позиции NAMESPACE="catProc_ru:Position"
+GoodsNumber=N3  |Номер товара в бухгалтерском документе NAMESPACE="catProc_ru:GoodsNumber"
+; ====> Количество товара из бухгалтерского документа, вошедшего в позицию
+GoodsQuantity{&&Num NAMESPACE="catProc_ru:GoodsQuantity"
+GoodsQuantity=N24.8  |! Количество товара в единице измерения NAMESPACE="catESAD_cu:GoodsQuantity"
+MeasureUnitQualifierName=C50  |Условное обозначение единицы измерения NAMESPACE="catESAD_cu:MeasureUnitQualifierName"
+MeasureUnitQualifierCode=C4  |Код по классификатору единиц измерения и счета Евразийского экономического союза PATTERN="[0-9A-Z]{2,3}|\d{3,4}" NAMESPACE="catESAD_cu:MeasureUnitQualifierCode"
+}
+}
+Comment=C250 250  |Примечание SEQ="1" NAMESPACE="Comment"
+}
+}
+; ====> Товары, использованные для создания объектов недвижимости
+GoodsInfo_Property{&&Num NAMESPACE="GoodsInfo#Property"
+Position=N3  |! Порядковый номер позиции NAMESPACE="Position"
+PropertyName=C250 250  |! Наименование объекта недвижимости SEQ="1" NAMESPACE="PropertyName"
+PropertyLocation=B |* Местонахождение объекта недвижимости NAMESPACE="PropertyLocation"
+PropertyLocation_AddressKindCode=C20  |Кодовое обозначение вида адреса: "1" - адрес регистрации; "2" - фактический адрес; "3" - почтовый адрес NAMESPACE="PropertyLocation#RUScat_ru:AddressKindCode"
+PropertyLocation_PostalCode=C9  |Почтовый индекс NAMESPACE="PropertyLocation#RUScat_ru:PostalCode"
+PropertyLocation_CountryCode=C2  |Буквенный код страны в соответствии с классификатором стран мира PATTERN="[A-Z]{2}|[0]{2}|[9]{2}" NAMESPACE="PropertyLocation#RUScat_ru:CountryCode"
+PropertyLocation_CounryName=C120  |Краткое название страны в соответствии с классификатором стран мира NAMESPACE="PropertyLocation#RUScat_ru:CounryName"
+PropertyLocation_Region=C120  |Регион (Наименование единицы административно-территориального деления первого уровня) NAMESPACE="PropertyLocation#RUScat_ru:Region"
+PropertyLocation_District=C120  |Район (Наименование единицы административно-территориального деления второго уровня) NAMESPACE="PropertyLocation#RUScat_ru:District"
+PropertyLocation_Town=C120  |Город NAMESPACE="PropertyLocation#RUScat_ru:Town"
+PropertyLocation_City=C120  |Населенный пункт NAMESPACE="PropertyLocation#RUScat_ru:City"
+PropertyLocation_StreetHouse=C120  |Улица (Наименование элемента улично-дорожной сети городской инфраструктуры) NAMESPACE="PropertyLocation#RUScat_ru:StreetHouse"
+PropertyLocation_House=C120  |Обозначение дома, корпуса, строения NAMESPACE="PropertyLocation#RUScat_ru:House"
+PropertyLocation_Room=C120  |Обозначение офиса или квартиры NAMESPACE="PropertyLocation#RUScat_ru:Room"
+PropertyLocation_AddressText=C1000  |Набор элементов адреса, представленных в свободной форме в виде текста. NAMESPACE="PropertyLocation#RUScat_ru:AddressText"
+PropertyLocation_OKTMO=C11  |Код ОКТМО (Общероссийский классификатор территорий муниципальных образований) NAMESPACE="PropertyLocation#RUScat_ru:OKTMO"
+PropertyLocation_OKATO=C11  |Код ОКАТО (Общероссийский классификатор объектов административно-территориального деления) PATTERN="\d{5,11}" NAMESPACE="PropertyLocation#RUScat_ru:OKATO"
+PropertyLocation_KLADR=C20  |Код КЛАДР NAMESPACE="PropertyLocation#RUScat_ru:KLADR"
+PropertyLocation_AOGUID=C36  |Глобальный идентификатор адресного объекта по ФИАС NAMESPACE="PropertyLocation#RUScat_ru:AOGUID"
+PropertyLocation_AOID=C36  |Уникальный идентификатор адресного объекта по ФИАС NAMESPACE="PropertyLocation#RUScat_ru:AOID"
+PropertyLocation_TerritoryCode=C17  |Код единицы административно-территориального деления NAMESPACE="PropertyLocation#RUScat_ru:TerritoryCode"
+PropertyLocation_PostOfficeBoxId=C20  |Номер абонентского ящика на предприятии почтовой связи NAMESPACE="PropertyLocation#RUScat_ru:PostOfficeBoxId"
+; ====> Техническая документация (технический паспорт), проектная документация
+TechDoc{&&Num NAMESPACE="TechDoc" OPT="1"
+PrDocumentName=C250  |Наименование документа NAMESPACE="cat_ru:PrDocumentName"
+PrDocumentNumber=C50  |Номер документа NAMESPACE="cat_ru:PrDocumentNumber"
+PrDocumentDate=D10  |Дата документа NAMESPACE="cat_ru:PrDocumentDate"
+}
+; ====> Сведения о постановке объекта недвижимости на баланс
+BalanceSheet{&&Num NAMESPACE="BalanceSheet" OPT="1"
+PrDocumentName=C250  |Наименование документа NAMESPACE="cat_ru:PrDocumentName"
+PrDocumentNumber=C50  |Номер документа NAMESPACE="cat_ru:PrDocumentNumber"
+PrDocumentDate=D10  |Дата документа NAMESPACE="cat_ru:PrDocumentDate"
+}
+; ====> Сведения о внесении записи о праве собственности
+OwnershipDoc{&&Num NAMESPACE="OwnershipDoc" OPT="1"
+PrDocumentName=C250  |Наименование документа NAMESPACE="cat_ru:PrDocumentName"
+PrDocumentNumber=C50  |Номер документа NAMESPACE="cat_ru:PrDocumentNumber"
+PrDocumentDate=D10  |Дата документа NAMESPACE="cat_ru:PrDocumentDate"
+}
+Comment=C250 250  |Примечание SEQ="1" NAMESPACE="Comment"
+; ====> Товары, использованные при создании объекта недвижимости
+PropertyGoods{&&Num NAMESPACE="PropertyGoods" OPT="1"
+Position=N3  |* Порядковый номер позиции NAMESPACE="Position"
+GoodsDescription=C250 250  |* Наименование товара SEQ="1" NAMESPACE="GoodsDescription"
+; ====> Cведения о товарах по ДТ
+PropertyGoodsDecl{&&Num NAMESPACE="PropertyGoodsDecl" OPT="1"
+CustomsCode=C8  |* Код таможенного органа, зарегистрировавшего документ PATTERN="[0-9]{2}|[0-9]{5}|[0-9]{8}" NAMESPACE="cat_ru:CustomsCode"
+RegistrationDate=D10  |* Дата регистрации документа NAMESPACE="cat_ru:RegistrationDate"
+GTDNumber=C7  |* Порядковый номер документа по журналу регистрации NAMESPACE="cat_ru:GTDNumber"
+; ====> Товары ДТ
+GoodsDeclnfo{&&Num NAMESPACE="GoodsDeclnfo" OPT="1"
+GoodsNumber=N3  |* Номер товара в ДТ NAMESPACE="GoodsNumber"
+; ====> Количество товара из ДТ, вошедшее в позицию
+GoodsQuantity{&&Num NAMESPACE="GoodsQuantity"
+GoodsQuantity=N24.8  |! Количество товара в единице измерения NAMESPACE="catESAD_cu:GoodsQuantity"
+MeasureUnitQualifierName=C50  |Условное обозначение единицы измерения NAMESPACE="catESAD_cu:MeasureUnitQualifierName"
+MeasureUnitQualifierCode=C4  |Код по классификатору единиц измерения и счета Евразийского экономического союза PATTERN="[0-9A-Z]{2,3}|\d{3,4}" NAMESPACE="catESAD_cu:MeasureUnitQualifierCode"
+}
+TechID=C250 50  |Технические идентификаторы SEQ="1" NAMESPACE="TechID"
+}
+}
+ComponentUseName=C250 250  |* Наименование составной (неотъемлемой) части объекта недвижимости при создании которой был использован товар SEQ="1" NAMESPACE="ComponentUseName"
+Comment=C250 250  |Примечание SEQ="1" NAMESPACE="Comment"
+; ====> Реквизиты документа бухгалтерского учета, согласно которому товары учтены резидентом
+AccountDoc{&&Num NAMESPACE="AccountDoc"
+PrDocumentName=C250  |Наименование документа NAMESPACE="cat_ru:PrDocumentName"
+PrDocumentNumber=C50  |Номер документа NAMESPACE="cat_ru:PrDocumentNumber"
+PrDocumentDate=D10  |Дата документа NAMESPACE="cat_ru:PrDocumentDate"
+Position=N3  |Порядковый номер позиции NAMESPACE="catProc_ru:Position"
+GoodsNumber=N3  |Номер товара в бухгалтерском документе NAMESPACE="catProc_ru:GoodsNumber"
+; ====> Количество товара из бухгалтерского документа, вошедшего в позицию
+GoodsQuantity{&&Num NAMESPACE="catProc_ru:GoodsQuantity"
+GoodsQuantity=N24.8  |! Количество товара в единице измерения NAMESPACE="catESAD_cu:GoodsQuantity"
+MeasureUnitQualifierName=C50  |Условное обозначение единицы измерения NAMESPACE="catESAD_cu:MeasureUnitQualifierName"
+MeasureUnitQualifierCode=C4  |Код по классификатору единиц измерения и счета Евразийского экономического союза PATTERN="[0-9A-Z]{2,3}|\d{3,4}" NAMESPACE="catESAD_cu:MeasureUnitQualifierCode"
+}
+}
+}
+}
+; ====> Товары, дополнительно установленные на объекте недвижимости
+GoodsInfo_AddInstaled{&&Num NAMESPACE="GoodsInfo#AddInstaled"
+Position=N3  |! Порядковый номер позиции NAMESPACE="Position"
+GoodsDescription=C250 250  |! Наименование товара SEQ="1" NAMESPACE="GoodsDescription"
+; ====> Сведения о товаре по ДТ
+AddInstaledGoods{&&Num NAMESPACE="AddInstaledGoods" OPT="1"
+CustomsCode=C8  |* Код таможенного органа, зарегистрировавшего документ PATTERN="[0-9]{2}|[0-9]{5}|[0-9]{8}" NAMESPACE="cat_ru:CustomsCode"
+RegistrationDate=D10  |* Дата регистрации документа NAMESPACE="cat_ru:RegistrationDate"
+GTDNumber=C7  |* Порядковый номер документа по журналу регистрации NAMESPACE="cat_ru:GTDNumber"
+; ====> Товары ДТ
+GoodsDeclnfo{&&Num NAMESPACE="GoodsDeclnfo" OPT="1"
+GoodsNumber=N3  |* Номер товара в ДТ NAMESPACE="GoodsNumber"
+; ====> Количество товара из ДТ, вошедшее в позицию
+GoodsQuantity{&&Num NAMESPACE="GoodsQuantity"
+GoodsQuantity=N24.8  |! Количество товара в единице измерения NAMESPACE="catESAD_cu:GoodsQuantity"
+MeasureUnitQualifierName=C50  |Условное обозначение единицы измерения NAMESPACE="catESAD_cu:MeasureUnitQualifierName"
+MeasureUnitQualifierCode=C4  |Код по классификатору единиц измерения и счета Евразийского экономического союза PATTERN="[0-9A-Z]{2,3}|\d{3,4}" NAMESPACE="catESAD_cu:MeasureUnitQualifierCode"
+}
+TechID=C250 50  |Технические идентификаторы SEQ="1" NAMESPACE="TechID"
+}
+}
+; ====> Сведения о сдаче-приемке работ по установке дополнительно установленного, смонтированного имущества
+AcceptanceWork{&&Num NAMESPACE="AcceptanceWork" OPT="1"
+PrDocumentName=C250  |Наименование документа NAMESPACE="cat_ru:PrDocumentName"
+PrDocumentNumber=C50  |Номер документа NAMESPACE="cat_ru:PrDocumentNumber"
+PrDocumentDate=D10  |Дата документа NAMESPACE="cat_ru:PrDocumentDate"
+}
+; ====> Документы бухгалтерского учета, свидетельствующие о проведенных работах по установке и монтажу товара
+AccountWorkDoc{&&Num NAMESPACE="AccountWorkDoc" OPT="1"
+PrDocumentName=C250  |Наименование документа NAMESPACE="cat_ru:PrDocumentName"
+PrDocumentNumber=C50  |Номер документа NAMESPACE="cat_ru:PrDocumentNumber"
+PrDocumentDate=D10  |Дата документа NAMESPACE="cat_ru:PrDocumentDate"
+}
+ComponentName=C250 250  |! Наименование составной (неотъемлемой) части объекта недвижимости при создании которой был использован товар SEQ="1" NAMESPACE="ComponentName"
+; ====> Реквизиты документа бухгалтерского учета, согласно которому товары учтены резидентом
+AccountDoc{&&Num NAMESPACE="AccountDoc"
+PrDocumentName=C250  |Наименование документа NAMESPACE="cat_ru:PrDocumentName"
+PrDocumentNumber=C50  |Номер документа NAMESPACE="cat_ru:PrDocumentNumber"
+PrDocumentDate=D10  |Дата документа NAMESPACE="cat_ru:PrDocumentDate"
+Position=N3  |Порядковый номер позиции NAMESPACE="catProc_ru:Position"
+GoodsNumber=N3  |Номер товара в бухгалтерском документе NAMESPACE="catProc_ru:GoodsNumber"
+; ====> Количество товара из бухгалтерского документа, вошедшего в позицию
+GoodsQuantity{&&Num NAMESPACE="catProc_ru:GoodsQuantity"
+GoodsQuantity=N24.8  |! Количество товара в единице измерения NAMESPACE="catESAD_cu:GoodsQuantity"
+MeasureUnitQualifierName=C50  |Условное обозначение единицы измерения NAMESPACE="catESAD_cu:MeasureUnitQualifierName"
+MeasureUnitQualifierCode=C4  |Код по классификатору единиц измерения и счета Евразийского экономического союза PATTERN="[0-9A-Z]{2,3}|\d{3,4}" NAMESPACE="catESAD_cu:MeasureUnitQualifierCode"
+}
+}
+}
+; ====> Представленные документы
+PresentedDoc{&&Num NAMESPACE="PresentedDoc"
+PrDocumentName=C250  |Наименование документа NAMESPACE="cat_ru:PrDocumentName"
+PrDocumentNumber=C50  |Номер документа NAMESPACE="cat_ru:PrDocumentNumber"
+PrDocumentDate=D10  |Дата документа NAMESPACE="cat_ru:PrDocumentDate"
+CustomsDocumentCode=C5  |Код вида представленного документа в соответствии с классификатором документов и сведений (РК ТС №378) PATTERN=".{5}" NAMESPACE="catProc_ru:CustomsDocumentCode"
+ElectronicDocumentID=C36  |Идентификатор документа, присвоенный информационной системой таможенных органов при представлении документа в электронном виде NAMESPACE="catProc_ru:ElectronicDocumentID"
+ElectronicArchID=C36  |Идентификатор хранилища электронных документов при представлении документа в электронном виде NAMESPACE="catProc_ru:ElectronicArchID"
+DocumentModeID=C30  |Код вида представленного документа в соответствии с альбомом форматов электронных форм документов NAMESPACE="catProc_ru:DocumentModeID"
+Position=N3  |! Порядковый номер позиции NAMESPACE="Position"
+SheetsNumber=N3  |Количество листов NAMESPACE="SheetsNumber"
+}
+; ====> Предшествующие документы
+PreviousDoc{&&Num NAMESPACE="PreviousDoc"
+NumPP=N5  |! Порядковый номер записи NAMESPACE="NumPP" MINVAL="1"
+GTDID=B |Регистрационный номер ДТ NAMESPACE="GTDID"
+GTDID_CustomsCode=C8  |! Код таможенного органа, зарегистрировавшего документ PATTERN="[0-9]{2}|[0-9]{5}|[0-9]{8}" NAMESPACE="GTDID#cat_ru:CustomsCode"
+GTDID_RegistrationDate=D10  |! Дата регистрации документа NAMESPACE="GTDID#cat_ru:RegistrationDate"
+GTDID_GTDNumber=C7  |! Порядковый номер документа по журналу регистрации NAMESPACE="GTDID#cat_ru:GTDNumber"
+GoodsNumeric=N3  |Порядковый номер товара в ДТ NAMESPACE="GoodsNumeric"
+; ====> Количество товара
+SupplementaryQuantity{&&Num NAMESPACE="SupplementaryQuantity"
+GoodsQuantity=N24.6  |! Количество товара в единице измерения NAMESPACE="cat_ru:GoodsQuantity"
+MeasureUnitQualifierName=C50  |Условное обозначение единицы измерения NAMESPACE="cat_ru:MeasureUnitQualifierName"
+MeasureUnitQualifierCode=C4  |Код единицы измерения в соответствии с единицами измерения, применяемыми в ТН ВЭД ЕАЭС NAMESPACE="cat_ru:MeasureUnitQualifierCode"
+}
+PrevTechID=C250 50  |Технические идентификаторы SEQ="1" NAMESPACE="PrevTechID"
+}
+ResidentSignature=B |* Подпись представителя резидента NAMESPACE="ResidentSignature"
+ResidentSignature_PersonSurname=C150  |Фамилия NAMESPACE="ResidentSignature#cat_ru:PersonSurname" PRNT="1"
+ResidentSignature_PersonName=C150  |Имя NAMESPACE="ResidentSignature#cat_ru:PersonName"
+ResidentSignature_PersonMiddleName=C150  |Отчество NAMESPACE="ResidentSignature#cat_ru:PersonMiddleName"
+ResidentSignature_PersonPost=C250  |Должность NAMESPACE="ResidentSignature#cat_ru:PersonPost"
+ResidentSignature_IssueDate=D10  |Дата подписания NAMESPACE="ResidentSignature#cat_ru:IssueDate"
