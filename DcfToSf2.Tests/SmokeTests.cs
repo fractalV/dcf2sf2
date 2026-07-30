@@ -57,6 +57,7 @@ public class SmokeTests
             Assert.Contains("Consignee_", text);
             Assert.Contains("Consignor_", text);
             Assert.Contains("@Container@", text);
+            Assert.Contains("Rect", text);
 
             // Single-column: Carrier and Consignee should not share the same Y for OrganizationName
             var carrier = FindData(text, "Carrier_OrganizationName");
@@ -122,7 +123,7 @@ public class SmokeTests
             Assert.Equal(seller!.Value.y, buyer!.Value.y);
             Assert.True(seller.Value.x < buyer.Value.x);
 
-            Assert.Contains("Line", text);
+            Assert.Contains("Rect", text);
             Assert.Contains("Pict", text);
         }
         finally

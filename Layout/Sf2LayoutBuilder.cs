@@ -1,59 +1,44 @@
+using DcfToSf2.Layout.Templates;
 using DcfToSf2.Parsing;
 
 namespace DcfToSf2.Layout;
 
 internal static class Sf2LayoutBuilder
 {
-    private static readonly string[] OrgPrefixes =
-    [
-        "Seller",
-        "Buyer",
-        "Consignor",
-        "Consignee",
-        "Carrier",
-        "Shipper",
-        "Declarant",
-        "Broker",
-        "Manufacturer",
-        "Destination",
-    ];
+    private static readonly FieldGroupTemplateRegistry Templates = FieldGroupTemplateRegistry.Default;
 
-    private static readonly (string Left, string Right)[] OrgPairs =
-    [
-        ("Seller", "Buyer"),
-        ("Consignor", "Consignee"),
-    ];
-
-    private static readonly string[] AddressSuffixes =
-    [
-        "AddressKindCode",
-        "PostalCode",
-        "CountryCode",
-        "CounryName",
-        "Region",
-        "District",
-        "Town",
-        "City",
-        "StreetHouse",
-        "House",
-        "Room",
-        "AddressText",
-        "PostOfficeBoxId",
-        "TerritoryCode",
-    ];
-
-    private static readonly string[] ContactSuffixes = ["Phone", "Fax", "Telex", "E_mail", "mail"];
-
-    private static readonly string[] OrgRequisiteSuffixes =
+    private static readonly string[] OrgStructuralSegments =
     [
         "OrganizationName",
-        "ShortName",
         "OrganizationLanguage",
+        "ShortName",
+        "RFOrganizationFeatures",
+        "RKOrganizationFeatures",
+        "RBOrganizationFeatures",
+        "RAOrganizationFeatures",
+        "KGOrganizationFeatures",
+        "Address",
+        "Contact",
+        "IdentityCard",
         "OGRN",
         "INN",
         "KPP",
         "OKPOID",
         "OKATOCode",
+        "Phone",
+        "Fax",
+        "Telex",
+        "E_mail",
+        "mail",
+    ];
+
+    private static readonly HashSet<string> OrgStructuralSet =
+        new(OrgStructuralSegments, StringComparer.OrdinalIgnoreCase);
+
+    private static readonly (string Left, string Right)[] OrgPairs =
+    [
+        ("Seller", "Buyer"),
+        ("Consignor", "Consignee"),
     ];
 
     public static Sf2Document Build(DcfParseResult parsed, ConversionOptions options)
@@ -247,8 +232,21 @@ internal static class Sf2LayoutBuilder
             );
         }
 
-        // Split: org groups vs other fields vs nested hyperlinks
-        var orgBuckets = new Dictionary<string, List<Data>>(StringComparer.OrdinalIgnoreCase);
+        // Root B-block titles: Applicant=B |* 2. Сведения о заявителе
+        var sectionTitles = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var f in fields.Where(IsBlockType))
+        {
+            if (SkipCountryFeatureHeader(f))
+                continue;
+            string name = f.FieldElement.ElementName;
+            string comment = ExtractComment(f.FieldElement.ElementValue);
+            if (!string.IsNullOrWhiteSpace(comment))
+                sectionTitles[name] = comment;
+            else
+                sectionTitles.TryAdd(name, name);
+        }
+
+        var sectionBuckets = new Dictionary<string, List<Data>>(StringComparer.OrdinalIgnoreCase);
         var other = new List<Data>();
         var hyperlinks = new List<Data>();
 
@@ -260,34 +258,19 @@ internal static class Sf2LayoutBuilder
                 continue;
             }
 
-            string? org = GetOrgPrefix(f.FieldElement.ElementName);
-            if (org is not null)
+            if (IsBlockType(f))
+                continue;
+
+            string? stem = GetSectionStem(f.FieldElement.ElementName, sectionTitles.Keys);
+            if (stem is not null)
             {
-                if (!orgBuckets.TryGetValue(org, out var list))
+                if (!sectionBuckets.TryGetValue(stem, out var list))
                 {
                     list = [];
-                    orgBuckets[org] = list;
+                    sectionBuckets[stem] = list;
                 }
 
                 list.Add(f);
-            }
-            else if (IsBlockType(f))
-            {
-                // section header text
-                string c = ExtractComment(f.FieldElement.ElementValue);
-                if (!string.IsNullOrEmpty(c))
-                {
-                    block.Fields.Add(
-                        TextField(
-                            Consts.Default_X,
-                            y,
-                            Math.Min(c.Length * Consts.DefaultWidthChar, Consts.DefaultWidthBlock),
-                            Consts.DefaultHeightText + 4,
-                            c
-                        )
-                    );
-                    y += Consts.DefaultHeightText + 8;
-                }
             }
             else
             {
@@ -295,66 +278,144 @@ internal static class Sf2LayoutBuilder
             }
         }
 
-        // Non-org fields first (document header area)
-        y = LayoutGenericFields(block, other, Consts.Default_X, y, Consts.DefaultWidthBlock - 8, options);
+        // Loose root fields (no B-block parent)
+        y = LayoutGenericFields(block, other, Consts.Default_X, y, Consts.DefaultWidthBlock - 8, options, Consts.DefaultBlockName);
 
-        // Orgs
-        var remainingOrgs = orgBuckets.Keys.ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var remaining = sectionBuckets.Keys.ToHashSet(StringComparer.OrdinalIgnoreCase);
         if (options.TwoColumn)
         {
-            foreach (var (left, right) in OrgPairs)
+            foreach (var (leftRole, rightRole) in OrgPairs)
             {
-                if (!orgBuckets.ContainsKey(left) && !orgBuckets.ContainsKey(right))
+                string? leftKey = FindOrgBucketKey(remaining, leftRole);
+                string? rightKey = FindOrgBucketKey(remaining, rightRole);
+                if (leftKey is null && rightKey is null)
                     continue;
 
                 y = LayoutOrgPair(
                     block,
-                    orgBuckets.GetValueOrDefault(left) ?? [],
-                    orgBuckets.GetValueOrDefault(right) ?? [],
-                    left,
-                    right,
+                    leftKey is not null ? sectionBuckets[leftKey] : [],
+                    rightKey is not null ? sectionBuckets[rightKey] : [],
+                    leftKey ?? leftRole,
+                    rightKey ?? rightRole,
                     y,
-                    options
+                    options,
+                    sectionTitles
                 );
-                remainingOrgs.Remove(left);
-                remainingOrgs.Remove(right);
-                AddHorizontalLine(block, y);
+                if (leftKey is not null)
+                    remaining.Remove(leftKey);
+                if (rightKey is not null)
+                    remaining.Remove(rightKey);
                 y += 8;
             }
         }
 
-        foreach (var org in remainingOrgs.OrderBy(o => o))
+        foreach (var stem in remaining.OrderBy(s => SectionOrder(s, fields)))
         {
-            y = LayoutOrgSingle(block, orgBuckets[org], org, y, options);
-            AddHorizontalLine(block, y);
+            string sectionTitle = ResolveSectionTitle(stem, sectionTitles);
+            y = LayoutSectionWithRect(block, sectionBuckets[stem], stem, sectionTitle, y, options);
             y += 8;
         }
 
-        // Hyperlinks to nested blocks
         foreach (var h in hyperlinks)
         {
             string label = FirstNonEmpty(h.RusNameBlock, h.FieldElement.ElementName);
-            string comment = $"@{h.FieldElement.ElementName}@{label}";
             block.Fields.Add(
-                TextField(
-                    Consts.Default_X,
-                    y,
-                    Math.Min(comment.Length * Consts.DefaultWidthChar, Consts.DefaultWidthBlock),
-                    Consts.DefaultHeightText + 4,
-                    comment.Replace("@@", "@").Replace($"@{Consts.SpecialDelimetr}", "@")
+                new Field(
+                    Type.Text,
+                    new Size(
+                        Math.Min((label.Length + h.FieldElement.ElementName.Length + 2) * Consts.DefaultWidthChar, 400),
+                        Consts.DefaultHeightText + 4
+                    ),
+                    new Position(Consts.Default_X, y),
+                    new Value("", $"@{h.FieldElement.ElementName}@{label}")
                 )
-            );
-            // Fix: hyperlink format in SF2 is @Block@Title without backtick between
-            block.Fields[^1] = new Field(
-                Type.Text,
-                new Size(Math.Min((label.Length + h.FieldElement.ElementName.Length + 2) * Consts.DefaultWidthChar, 400), Consts.DefaultHeightText + 4),
-                new Position(Consts.Default_X, y),
-                new Value("", $"@{h.FieldElement.ElementName}@{label}")
             );
             y += Consts.DefaultHeightData + 4;
         }
 
         return block;
+    }
+
+    private static int SectionOrder(string stem, List<Data> fields)
+    {
+        int idx = fields.FindIndex(f =>
+            f.FieldElement.ElementName.Equals(stem, StringComparison.OrdinalIgnoreCase)
+            || f.FieldElement.ElementName.StartsWith(stem + "_", StringComparison.OrdinalIgnoreCase)
+        );
+        return idx < 0 ? int.MaxValue : idx;
+    }
+
+    private static string ResolveSectionTitle(string stem, Dictionary<string, string> sectionTitles)
+    {
+        if (sectionTitles.TryGetValue(stem, out var t) && !string.IsNullOrWhiteSpace(t))
+            return t;
+        return OrgTitle(stem);
+    }
+
+    private static string? GetSectionStem(string fieldName, IEnumerable<string> sectionNames)
+    {
+        string? org = GetOrgStem(fieldName);
+        if (org is not null)
+            return org;
+
+        foreach (var sec in sectionNames.OrderByDescending(s => s.Length))
+        {
+            if (
+                fieldName.Equals(sec, StringComparison.OrdinalIgnoreCase)
+                || fieldName.StartsWith(sec + "_", StringComparison.OrdinalIgnoreCase)
+            )
+                return sec;
+        }
+
+        return null;
+    }
+
+    private static int LayoutSectionWithRect(
+        Block block,
+        List<Data> fields,
+        string stem,
+        string sectionTitle,
+        int startY,
+        ConversionOptions options
+    )
+    {
+        const int pad = 8;
+        int contentY = startY + pad;
+        bool isOrg = fields.Any(f => GetOrgStem(f.FieldElement.ElementName) is not null);
+
+        int endY = isOrg
+            ? Templates.Organization.LayoutOrgFields(
+                block,
+                fields,
+                Consts.Default_X + 4,
+                contentY,
+                Consts.DefaultWidthBlock - 16,
+                options.IgnoreFields
+            )
+            : LayoutGenericFields(
+                block,
+                fields,
+                Consts.Default_X + 4,
+                contentY,
+                Consts.DefaultWidthBlock - 16,
+                options,
+                Consts.DefaultBlockName
+            );
+
+        int height = Math.Max(endY - startY + pad, Consts.DefaultHeightData + pad * 2);
+        AddSectionRect(block, Consts.Default_X, startY, Consts.DefaultWidthBlock - 8, height, sectionTitle);
+        return startY + height;
+    }
+
+    private static void AddSectionRect(Block block, int x, int y, int w, int h, string title)
+    {
+        if (h < 12 || w < 16)
+            return;
+
+        // Rect caption is plain text (no `), as in Alta samples.
+        block.Fields.Add(
+            new Field(Type.Rect, new Size(w, h), new Position(x, y), new Value(title.Trim(), string.Empty))
+        );
     }
 
     private static Block BuildNestedBlock(
@@ -379,7 +440,15 @@ internal static class Sf2LayoutBuilder
         var content = fields.Where(f => !IsBlockOpenMarker(f) || f.FieldElement.ElementName != leaf).ToList();
         // nested hyperlinks inside
         int y = Consts.Default_Y;
-        y = LayoutGenericFields(block, content.Where(f => !IsBlockOpenMarker(f)).ToList(), Consts.Default_X, y, Consts.DefaultWidthBlock - 8, options);
+        y = LayoutGenericFields(
+            block,
+            content.Where(f => !IsBlockOpenMarker(f)).ToList(),
+            Consts.Default_X,
+            y,
+            Consts.DefaultWidthBlock - 8,
+            options,
+            path
+        );
 
         foreach (var h in content.Where(IsBlockOpenMarker))
         {
@@ -398,23 +467,6 @@ internal static class Sf2LayoutBuilder
         return block;
     }
 
-    private static int LayoutOrgSingle(
-        Block block,
-        List<Data> fields,
-        string orgName,
-        int startY,
-        ConversionOptions options
-    )
-    {
-        int y = startY;
-        block.Fields.Add(
-            TextField(Consts.Default_X, y, orgName.Length * Consts.DefaultWidthChar + 20, 16, OrgTitle(orgName))
-        );
-        y += 20;
-
-        return LayoutOrgFields(block, fields, Consts.Default_X, y, Consts.DefaultWidthBlock - 12, options);
-    }
-
     private static int LayoutOrgPair(
         Block block,
         List<Data> leftFields,
@@ -422,230 +474,64 @@ internal static class Sf2LayoutBuilder
         string leftName,
         string rightName,
         int startY,
-        ConversionOptions options
+        ConversionOptions options,
+        Dictionary<string, string> sectionTitles
     )
     {
-        int y = startY;
-        block.Fields.Add(TextField(Consts.Default_X, y, 80, 20, OrgTitle(leftName)));
-        block.Fields.Add(TextField(Consts.RightColumnX, y, 80, 20, OrgTitle(rightName)));
-        y += 24;
+        const int pad = 8;
+        int contentY = startY + pad;
+        int colW = Consts.ColumnWidth - 4;
 
-        // Vertical separator
-        block.Fields.Add(
-            new Field(
-                Type.Line,
-                new Size(4, 200),
-                new Position(Consts.RightColumnX - 4, y - 4),
-                new Value("", "")
-            )
-        );
-
-        int yLeft = LayoutOrgFields(block, leftFields, Consts.Default_X, y, Consts.ColumnWidth, options);
-        int yRight = LayoutOrgFields(block, rightFields, Consts.RightColumnX, y, Consts.ColumnWidth, options);
-        return Math.Max(yLeft, yRight);
-    }
-
-    private static int LayoutOrgFields(
-        Block block,
-        List<Data> fields,
-        int baseX,
-        int startY,
-        int maxWidth,
-        ConversionOptions options
-    )
-    {
-        int y = startY;
-        var bySuffix = fields.ToLookup(f => DcfParser.GetLastToken(f.FieldElement.ElementName), StringComparer.OrdinalIgnoreCase);
-
-        // OrganizationName
-        foreach (var f in fields.Where(f => DcfParser.GetLastToken(f.FieldElement.ElementName).Equals("OrganizationName", StringComparison.OrdinalIgnoreCase)))
-        {
-            y = PlaceLabeledData(block, f, baseX, y, maxWidth, options, putLabelOnData: true);
-        }
-
-        // ShortName + requisites row
-        var shortName = fields.FirstOrDefault(f =>
-            DcfParser.GetLastToken(f.FieldElement.ElementName).Equals("ShortName", StringComparison.OrdinalIgnoreCase)
-        );
-        var requisites = fields
-            .Where(f =>
-            {
-                string s = DcfParser.GetLastToken(f.FieldElement.ElementName);
-                return s is "OGRN" or "INN" or "KPP" or "OKPOID" or "OKATOCode";
-            })
-            .ToList();
-
-        if (shortName is not null || requisites.Count > 0)
-        {
-            int x = baseX;
-            if (shortName is not null && !DcfParser.ShouldSkipField(shortName.FieldElement.ElementName, options.IgnoreFields))
-            {
-                int w = Math.Min(240, maxWidth / 2);
-                block.Fields.Add(DataField(shortName, x, y, w, Consts.DefaultHeightData));
-                MaybeAddPict(block, shortName, x + w - 16, y);
-                x += w + 4;
-            }
-
-            foreach (var r in requisites)
-            {
-                if (DcfParser.ShouldSkipField(r.FieldElement.ElementName, options.IgnoreFields))
-                    continue;
-                string label = ShortLabel(DcfParser.GetLastToken(r.FieldElement.ElementName));
-                block.Fields.Add(TextField(x, y - 12, label.Length * Consts.DefaultWidthChar, Consts.DefaultHeightText, label));
-                int w = WidthFor(r, 100);
-                block.Fields.Add(DataField(r, x, y, w, Consts.DefaultHeightData, labelOverride: null));
-                MaybeAddPict(block, r, x + w - 4, y - 4);
-                x += w + 4;
-                if (x > baseX + maxWidth - 40)
-                {
-                    x = baseX;
-                    y += Consts.DefaultHeightData + 16;
-                }
-            }
-
-            y += Consts.DefaultHeightData + 8;
-        }
-
-        // Contacts row with ignore-fields compaction
-        var contacts = ContactSuffixes
-            .Select(s => fields.FirstOrDefault(f => DcfParser.GetLastToken(f.FieldElement.ElementName).Equals(s, StringComparison.OrdinalIgnoreCase)))
-            .Where(f => f is not null && !DcfParser.ShouldSkipField(f!.FieldElement.ElementName, options.IgnoreFields))
-            .Cast<Data>()
-            .ToList();
-
-        if (contacts.Count > 0)
-        {
-            int x = baseX;
-            int slot = Math.Max(80, (maxWidth - 8) / Math.Max(1, contacts.Count));
-            foreach (var c in contacts)
-            {
-                string label = ExtractComment(c.FieldElement.ElementValue);
-                if (string.IsNullOrEmpty(label))
-                    label = ShortLabel(DcfParser.GetLastToken(c.FieldElement.ElementName));
-                int w = Math.Min(slot - 4, WidthFor(c, slot - 4));
-                block.Fields.Add(DataField(c, x, y, w, Consts.DefaultHeightData, label));
-                x += w + 4;
-            }
-
-            y += Consts.DefaultHeightData + 8;
-        }
-
-        // Address fields compacted
-        var addressFields = fields
-            .Where(f =>
-            {
-                string s = DcfParser.GetLastToken(f.FieldElement.ElementName);
-                return AddressSuffixes.Contains(s, StringComparer.OrdinalIgnoreCase)
-                    && !DcfParser.ShouldSkipField(f.FieldElement.ElementName, options.IgnoreFields);
-            })
-            .ToList();
-
-        if (addressFields.Count > 0)
-            y = LayoutAddressRow(block, addressFields, baseX, y, maxWidth);
-
-        // Remaining org fields (EAEU features etc.)
-        var placed = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        foreach (var f in fields)
-        {
-            string last = DcfParser.GetLastToken(f.FieldElement.ElementName);
-            if (
-                last is "OrganizationName" or "ShortName" or "OGRN" or "INN" or "KPP" or "OKPOID" or "OKATOCode"
-                || ContactSuffixes.Contains(last, StringComparer.OrdinalIgnoreCase)
-                || AddressSuffixes.Contains(last, StringComparer.OrdinalIgnoreCase)
-                || last.Equals("OrganizationLanguage", StringComparison.OrdinalIgnoreCase)
-            )
-            {
-                placed.Add(f.FieldElement.ElementName);
-            }
-        }
-
-        var rest = fields
-            .Where(f =>
-                !placed.Contains(f.FieldElement.ElementName)
-                && !IsBlockType(f)
-                && !DcfParser.ShouldSkipField(f.FieldElement.ElementName, options.IgnoreFields)
-            )
-            .ToList();
-
-        if (rest.Count > 0)
-            y = LayoutFlowRow(block, rest, baseX, y, maxWidth);
-
-        return y;
-    }
-
-    private static int LayoutAddressRow(Block block, List<Data> fields, int baseX, int y, int maxWidth)
-    {
-        // Row1: CountryCode, CounryName, PostalCode
-        // Row2: Region, City
-        // Row3: StreetHouse
-        int x = baseX;
-        void Place(Data? f, int w)
-        {
-            if (f is null)
-                return;
-            string label = ExtractComment(f.FieldElement.ElementValue);
-            block.Fields.Add(DataField(f, x, y, w, Consts.DefaultHeightData, string.IsNullOrEmpty(label) ? null : label));
-            x += w + 4;
-        }
-
-        Data? Find(string suffix) =>
-            fields.FirstOrDefault(f =>
-                DcfParser.GetLastToken(f.FieldElement.ElementName).Equals(suffix, StringComparison.OrdinalIgnoreCase)
+        int yLeft = leftFields.Count == 0
+            ? contentY
+            : Templates.Organization.LayoutOrgFields(
+                block,
+                leftFields,
+                Consts.Default_X + 4,
+                contentY,
+                colW,
+                options.IgnoreFields
+            );
+        int yRight = rightFields.Count == 0
+            ? contentY
+            : Templates.Organization.LayoutOrgFields(
+                block,
+                rightFields,
+                Consts.RightColumnX + 4,
+                contentY,
+                colW,
+                options.IgnoreFields
             );
 
-        Place(Find("CountryCode"), 32);
-        Place(Find("CounryName"), Math.Min(252, maxWidth / 2));
-        Place(Find("PostalCode"), 92);
-        y += Consts.DefaultHeightData + 4;
-        x = baseX;
-        Place(Find("Region"), Math.Min(220, maxWidth / 2));
-        Place(Find("City"), Math.Min(160, maxWidth / 2));
-        y += Consts.DefaultHeightData + 4;
-        x = baseX;
-        Place(Find("StreetHouse"), maxWidth - 8);
-        y += Consts.DefaultHeightData + 4;
+        int endY = Math.Max(yLeft, yRight);
+        int height = Math.Max(endY - startY + pad, Consts.DefaultHeightData + pad * 2);
+        int rectW = Consts.ColumnWidth + 4;
 
-        // any other address leftovers
-        var known = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        if (leftFields.Count > 0)
         {
-            "CountryCode",
-            "CounryName",
-            "PostalCode",
-            "Region",
-            "City",
-            "StreetHouse",
-        };
-        var extra = fields
-            .Where(f => !known.Contains(DcfParser.GetLastToken(f.FieldElement.ElementName)))
-            .ToList();
-        if (extra.Count > 0)
-            y = LayoutFlowRow(block, extra, baseX, y, maxWidth);
-
-        return y;
-    }
-
-    private static int LayoutFlowRow(Block block, List<Data> fields, int baseX, int y, int maxWidth)
-    {
-        int x = baseX;
-        foreach (var f in fields)
-        {
-            int w = Math.Min(WidthFor(f, 120), maxWidth);
-            if (x + w > baseX + maxWidth)
-            {
-                x = baseX;
-                y += Consts.DefaultHeightData + 4;
-            }
-
-            string label = ExtractComment(f.FieldElement.ElementValue);
-            // Prefer short labels for EAEU codes
-            string last = DcfParser.GetLastToken(f.FieldElement.ElementName);
-            string? shortL = ShortLabelOrNull(last);
-            block.Fields.Add(DataField(f, x, y, w, HeightFor(f), shortL ?? (label.Length > 40 ? null : label)));
-            MaybeAddPict(block, f, x + w - 4, y);
-            x += w + 4;
+            AddSectionRect(
+                block,
+                Consts.Default_X,
+                startY,
+                rectW,
+                height,
+                ResolveSectionTitle(leftName, sectionTitles)
+            );
         }
 
-        return y + Consts.DefaultHeightData + 8;
+        if (rightFields.Count > 0)
+        {
+            AddSectionRect(
+                block,
+                Consts.RightColumnX,
+                startY,
+                rectW,
+                height,
+                ResolveSectionTitle(rightName, sectionTitles)
+            );
+        }
+
+        return startY + height;
     }
 
     private static int LayoutGenericFields(
@@ -654,13 +540,12 @@ internal static class Sf2LayoutBuilder
         int baseX,
         int startY,
         int maxWidth,
-        ConversionOptions options
+        ConversionOptions options,
+        string? blockPath = null
     )
     {
         int y = startY;
-        int x = baseX;
 
-        // Group known templates: PrDocument*, Loading/Unloading, signature, DT number
         var remaining = new List<Data>();
         foreach (var f in fields)
         {
@@ -709,10 +594,24 @@ internal static class Sf2LayoutBuilder
         y = LayoutSignature(block, remaining, baseX, y, maxWidth, out var usedSig);
         remaining = remaining.Where(f => !usedSig.Contains(f.FieldElement.ElementName)).ToList();
 
-        // Default stacked / flow for the rest
-        foreach (var f in remaining)
+        y = Templates.LayoutWithTemplates(
+            block,
+            remaining,
+            baseX,
+            y,
+            maxWidth,
+            options.IgnoreFields,
+            blockPath,
+            StackFields
+        );
+
+        return y;
+    }
+
+    private static int StackFields(Block block, List<Data> fields, int baseX, int y, int maxWidth)
+    {
+        foreach (var f in fields)
         {
-            string last = DcfParser.GetLastToken(f.FieldElement.ElementName);
             bool seq = f.FieldElement.ElementValue.Contains("SEQ=", StringComparison.OrdinalIgnoreCase);
             int h = HeightFor(f);
             int w = Math.Min(WidthFor(f, maxWidth), maxWidth);
@@ -720,16 +619,20 @@ internal static class Sf2LayoutBuilder
 
             if (!string.IsNullOrEmpty(comment) && comment.Length < 60)
             {
-                block.Fields.Add(TextField(baseX, y, Math.Min(comment.Length * Consts.DefaultWidthChar, maxWidth), Consts.DefaultHeightText, comment));
+                block.Fields.Add(
+                    TextField(baseX, y, Math.Min(comment.Length * Consts.DefaultWidthChar, maxWidth), Consts.DefaultHeightText, comment)
+                );
                 y += Consts.DefaultHeightText + 2;
                 block.Fields.Add(DataField(f, baseX, y, w, h));
             }
             else
             {
-                block.Fields.Add(DataField(f, baseX, y, w, h, comment.Length > 0 && comment.Length < 80 ? comment : null));
+                block.Fields.Add(
+                    DataField(f, baseX, y, w, h, comment.Length > 0 && comment.Length < 80 ? comment : null)
+                );
             }
 
-            MaybeAddPict(block, f, baseX + w - 4, y);
+            MaybeAddPict(block, f, baseX, y, w);
             y += h + (seq ? 4 : 8);
         }
 
@@ -781,7 +684,7 @@ internal static class Sf2LayoutBuilder
             block.Fields.Add(TextField(x, y, 16, 16, "от"));
             int w = 84;
             block.Fields.Add(DataField(date, x + 20, y, w, Consts.DefaultHeightData));
-            MaybeAddPict(block, date, x + 20 + w, y, datePict: true);
+            MaybeAddPict(block, date, x + 20, y, w, datePict: true);
             used.Add(date.FieldElement.ElementName);
         }
 
@@ -841,10 +744,11 @@ internal static class Sf2LayoutBuilder
                 };
                 string label = ExtractComment(f.FieldElement.ElementValue);
                 block.Fields.Add(DataField(f, x, y, w, Consts.DefaultHeightData, string.IsNullOrEmpty(label) ? null : label));
+                int pictExtra = 0;
                 if (suffix == "IssueDate")
-                    MaybeAddPict(block, f, x + w, y, datePict: true);
+                    pictExtra = MaybeAddPict(block, f, x, y, w, datePict: true);
                 used.Add(f.FieldElement.ElementName);
-                x += w + 4;
+                x += w + 4 + pictExtra;
             }
 
             y += Consts.DefaultHeightData + 16;
@@ -860,24 +764,8 @@ internal static class Sf2LayoutBuilder
         );
     }
 
-    private static void MaybeAddPict(Block block, Data field, int x, int y, bool datePict = false)
-    {
-        string name = field.FieldElement.ElementName;
-        string last = DcfParser.GetLastToken(name);
-        bool isCode = last.EndsWith("Code", StringComparison.OrdinalIgnoreCase) || last.Equals("INN", StringComparison.OrdinalIgnoreCase);
-        bool isDate =
-            datePict
-            || last.EndsWith("Date", StringComparison.OrdinalIgnoreCase)
-            || field.FieldElement.ElementValue.TrimStart().StartsWith("D", StringComparison.OrdinalIgnoreCase);
-
-        if (!isCode && !isDate)
-            return;
-
-        string pictValue = isDate ? $"{name}=DATE" : name;
-        block.Fields.Add(
-            new Field(Type.Pict, new Size(12, 12), new Position(Math.Max(0, x), y), new Value("", pictValue))
-        );
-    }
+    private static int MaybeAddPict(Block block, Data field, int fieldX, int fieldY, int fieldW, bool datePict = false) =>
+        LayoutUtil.MaybeAddPict(block, field, fieldX, fieldY, fieldW, datePict);
 
     private static Field TextField(int x, int y, int w, int h, string text) =>
         new(Type.Text, new Size(Math.Max(8, w), h), new Position(x, y), new Value("", text));
@@ -960,35 +848,68 @@ internal static class Sf2LayoutBuilder
         return comment.Trim();
     }
 
-    private static string? GetOrgPrefix(string fieldName)
+    /// <summary>
+    /// Stem of an organization field group, e.g. Seller, ConsignorDetails.
+    /// Matches classic Seller_* and compound ConsignorDetails_RFOrganizationFeatures_INN.
+    /// </summary>
+    private static string? GetOrgStem(string fieldName)
     {
-        foreach (var p in OrgPrefixes.OrderByDescending(x => x.Length))
+        if (string.IsNullOrEmpty(fieldName))
+            return null;
+
+        var parts = fieldName.Split('_', StringSplitOptions.RemoveEmptyEntries);
+        if (parts.Length < 2)
+            return null;
+
+        int structuralAt = -1;
+        for (int i = 0; i < parts.Length; i++)
         {
-            if (
-                fieldName.Equals(p, StringComparison.OrdinalIgnoreCase)
-                || fieldName.StartsWith(p + "_", StringComparison.OrdinalIgnoreCase)
-            )
-                return p;
+            if (OrgStructuralSet.Contains(parts[i]))
+            {
+                structuralAt = i;
+                break;
+            }
         }
 
-        return null;
+        if (structuralAt <= 0)
+            return null;
+
+        return string.Join("_", parts.Take(structuralAt));
     }
 
-    private static string OrgTitle(string org) =>
-        org.ToLowerInvariant() switch
+    private static string? FindOrgBucketKey(IEnumerable<string> keys, string role) =>
+        keys.Where(k =>
+                k.Equals(role, StringComparison.OrdinalIgnoreCase)
+                || k.StartsWith(role, StringComparison.OrdinalIgnoreCase)
+            )
+            .OrderBy(k => k.Length)
+            .FirstOrDefault();
+
+    private static string OrgTitle(string org)
+    {
+        foreach (var (role, title) in new (string Role, string Title)[]
         {
-            "seller" => "Продавец",
-            "buyer" => "Покупатель",
-            "consignor" => "Отправитель",
-            "consignee" => "Получатель",
-            "carrier" => "Перевозчик",
-            "shipper" => "Грузоотправитель",
-            "declarant" => "Декларант",
-            "broker" => "Брокер",
-            "manufacturer" => "Производитель",
-            "destination" => "Место назначения",
-            _ => org,
-        };
+            ("Consignee", "Получатель"),
+            ("Consignor", "Отправитель"),
+            ("Seller", "Продавец"),
+            ("Buyer", "Покупатель"),
+            ("Carrier", "Перевозчик"),
+            ("Shipper", "Грузоотправитель"),
+            ("Declarant", "Декларант"),
+            ("Broker", "Брокер"),
+            ("Manufacturer", "Производитель"),
+            ("Destination", "Место назначения"),
+        })
+        {
+            if (
+                org.Equals(role, StringComparison.OrdinalIgnoreCase)
+                || org.StartsWith(role, StringComparison.OrdinalIgnoreCase)
+            )
+                return title;
+        }
+
+        return org;
+    }
 
     private static string ShortLabel(string suffix) =>
         suffix.ToUpperInvariant() switch

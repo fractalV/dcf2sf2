@@ -1,5 +1,8 @@
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Input;
+using System.Windows.Media;
+using DcfToSf2.Layout.Templates;
 using DcfToSf2.Parsing;
 
 namespace DcfToSf2.Ui;
@@ -95,6 +98,201 @@ internal partial class IgnoreFieldsDialog : Window
         }
 
         return c;
+    }
+
+    private void TreeNode_PreviewMouseDown(object sender, MouseButtonEventArgs e)
+    {
+        if (sender is not DependencyObject d)
+            return;
+        var item = FindAncestor<TreeViewItem>(d);
+        if (item is not null)
+            item.IsSelected = true;
+    }
+
+    private static T? FindAncestor<T>(DependencyObject? current)
+        where T : DependencyObject
+    {
+        while (current is not null)
+        {
+            if (current is T match)
+                return match;
+            current = VisualTreeHelper.GetParent(current);
+        }
+
+        return null;
+    }
+
+    private IgnoreBlockNode? ResolveSelectedBlock()
+    {
+        return FieldsTree.SelectedItem switch
+        {
+            IgnoreBlockNode block => block,
+            IgnoreFieldNode field => field.Parent,
+            _ => null,
+        };
+    }
+
+    private void CreateTemplate_Click(object sender, RoutedEventArgs e)
+    {
+        var block = ResolveSelectedBlock();
+        if (block is null)
+        {
+            MessageBox.Show(
+                this,
+                "Выделите ветку (блок) в дереве документа.",
+                "Создать шаблон",
+                MessageBoxButton.OK,
+                MessageBoxImage.Information
+            );
+            return;
+        }
+
+        if (block.Fields.Count == 0)
+        {
+            MessageBox.Show(
+                this,
+                "В выбранной ветке нет полей.",
+                "Создать шаблон",
+                MessageBoxButton.OK,
+                MessageBoxImage.Information
+            );
+            return;
+        }
+
+        string defaultName = IgnoreBlockNode.LeafName(block.Path);
+        if (!TryPromptTemplateName(defaultName, out string templateName))
+            return;
+
+        var byName = _parsed.Fields
+            .Where(f =>
+                string.Equals(
+                    string.IsNullOrWhiteSpace(f.Path) ? Consts.DefaultBlockName : f.Path,
+                    block.Path,
+                    StringComparison.OrdinalIgnoreCase
+                )
+            )
+            .GroupBy(f => f.FieldElement.ElementName, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(g => g.Key, g => g.First(), StringComparer.OrdinalIgnoreCase);
+
+        var fieldTuples = block.Fields
+            .Select(f =>
+            {
+                byName.TryGetValue(f.Name, out var data);
+                string value = data?.FieldElement.ElementValue ?? "C50 |";
+                return (f.Name, f.Label, value);
+            })
+            .ToList();
+
+        var def = UserDefinedFieldGroupTemplate.CreateFromBranch(
+            block.Path,
+            block.Title,
+            fieldTuples,
+            templateName
+        );
+        if (def.Fields.Count == 0)
+        {
+            MessageBox.Show(
+                this,
+                "Не удалось собрать поля для шаблона.",
+                "Создать шаблон",
+                MessageBoxButton.OK,
+                MessageBoxImage.Warning
+            );
+            return;
+        }
+
+        var created = UserTemplateStore.Add(def);
+        // Persist without Load() — Load would wipe the just-added template from memory.
+        UiSettings.PersistStores();
+
+        MessageBox.Show(
+            this,
+            $"Шаблон «{created.Name}» создан из ветки «{block.Path}» ({def.Fields.Count} полей).\n"
+                + "Откройте «Шаблоны…» в главном окне, чтобы отредактировать раскладку.",
+            "Создать шаблон",
+            MessageBoxButton.OK,
+            MessageBoxImage.Information
+        );
+    }
+
+    private bool TryPromptTemplateName(string defaultName, out string name)
+    {
+        name = defaultName;
+        var dlg = new Window
+        {
+            Title = "Имя шаблона",
+            Owner = this,
+            WindowStartupLocation = WindowStartupLocation.CenterOwner,
+            ResizeMode = ResizeMode.NoResize,
+            SizeToContent = SizeToContent.WidthAndHeight,
+            ShowInTaskbar = false,
+        };
+        var panel = new StackPanel { Margin = new Thickness(12), Width = 360 };
+        panel.Children.Add(
+            new TextBlock
+            {
+                Text = "Имя нового шаблона раскладки:",
+                Margin = new Thickness(0, 0, 0, 8),
+                TextWrapping = TextWrapping.Wrap,
+            }
+        );
+        var box = new TextBox
+        {
+            Text = defaultName,
+            Margin = new Thickness(0, 0, 0, 12),
+            MinWidth = 320,
+        };
+        panel.Children.Add(box);
+        var buttons = new StackPanel
+        {
+            Orientation = Orientation.Horizontal,
+            HorizontalAlignment = HorizontalAlignment.Right,
+        };
+        var ok = new Button
+        {
+            Content = "OK",
+            IsDefault = true,
+            Width = 88,
+            Margin = new Thickness(0, 0, 8, 0),
+            Padding = new Thickness(12, 4, 12, 4),
+        };
+        var cancel = new Button
+        {
+            Content = "Отмена",
+            IsCancel = true,
+            Width = 88,
+            Padding = new Thickness(12, 4, 12, 4),
+        };
+        bool accepted = false;
+        ok.Click += (_, _) =>
+        {
+            if (string.IsNullOrWhiteSpace(box.Text))
+            {
+                MessageBox.Show(
+                    dlg,
+                    "Укажите имя шаблона.",
+                    "Имя шаблона",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Information
+                );
+                return;
+            }
+
+            accepted = true;
+            dlg.DialogResult = true;
+        };
+        cancel.Click += (_, _) => dlg.DialogResult = false;
+        buttons.Children.Add(ok);
+        buttons.Children.Add(cancel);
+        panel.Children.Add(buttons);
+        dlg.Content = panel;
+        box.SelectAll();
+        box.Focus();
+        if (dlg.ShowDialog() != true || !accepted)
+            return false;
+
+        name = box.Text.Trim();
+        return true;
     }
 
     private void SelectAll_Click(object sender, RoutedEventArgs e)
@@ -251,7 +449,6 @@ internal partial class IgnoreFieldsDialog : Window
             else
                 _manualChecked.Remove(field.Name);
 
-            // Pattern matches stay checked even if user tries to uncheck
             if (!field.IsChecked && field.IsPatternMatch)
             {
                 _suppressBlockEvents = true;

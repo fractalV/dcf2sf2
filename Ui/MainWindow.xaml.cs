@@ -173,6 +173,12 @@ public partial class MainWindow : Window
         view.ShowDialog();
     }
 
+    private void ViewTemplates_Click(object sender, RoutedEventArgs e)
+    {
+        var preview = new TemplateLayoutPreviewWindow(_ignoreFields, _settings) { Owner = this };
+        preview.ShowDialog();
+    }
+
     private bool TryParseCurrentDcf(out DcfParseResult parsed, out FileInfo inputFile)
     {
         parsed = null!;

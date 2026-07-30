@@ -17,6 +17,9 @@ internal static class MainOperations
 
         try
         {
+            // Apply saved template geometry from UI settings (if any)
+            _ = Ui.UiSettings.Load();
+
             if (!options.InputFile.Exists)
             {
                 log.Error($"Файл не найден: {options.InputFile.FullName}");

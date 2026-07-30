@@ -72,6 +72,12 @@
         <TreeView x:Name="FieldsTree"
                   VirtualizingStackPanel.IsVirtualizing="True"
                   VirtualizingStackPanel.VirtualizationMode="Recycling">
+            <TreeView.ContextMenu>
+                <ContextMenu>
+                    <MenuItem Header="Создать шаблон из ветки…"
+                              Click="CreateTemplate_Click" />
+                </ContextMenu>
+            </TreeView.ContextMenu>
             <TreeView.ItemContainerStyle>
                 <Style TargetType="TreeViewItem">
                     <Setter Property="IsExpanded" Value="True" />
@@ -83,6 +89,7 @@
                     <CheckBox Content="{Binding Header}"
                               IsChecked="{Binding IsChecked, Mode=TwoWay}"
                               IsThreeState="True"
+                              PreviewMouseDown="TreeNode_PreviewMouseDown"
                               Checked="BlockCheckBox_Changed"
                               Unchecked="BlockCheckBox_Changed"
                               Indeterminate="BlockCheckBox_Changed">
@@ -103,6 +110,7 @@
                               IsChecked="{Binding IsChecked, Mode=TwoWay}"
                               Checked="FieldCheckBox_Changed"
                               Unchecked="FieldCheckBox_Changed"
+                              PreviewMouseDown="TreeNode_PreviewMouseDown"
                               Padding="2,1">
                         <CheckBox.Style>
                             <Style TargetType="CheckBox">

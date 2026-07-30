@@ -80,8 +80,13 @@
                     Click="SelectIgnoreFields_Click" />
             <Button Content="Список…"
                     Padding="12,4"
+                    Margin="0,0,0,4"
                     ToolTip="Показать все поля DCF, которые будут пропущены"
                     Click="ViewIgnoredFields_Click" />
+            <Button Content="Шаблоны…"
+                    Padding="12,4"
+                    ToolTip="Превью расположения полей шаблонов раскладки"
+                    Click="ViewTemplates_Click" />
         </StackPanel>
         <Button x:Name="ConvertButton"
                 Grid.Row="5" Grid.Column="0" Grid.ColumnSpan="3"

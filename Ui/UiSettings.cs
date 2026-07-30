@@ -1,4 +1,5 @@
 using System.Text.Json;
+using DcfToSf2.Layout.Templates;
 
 namespace DcfToSf2.Ui;
 
@@ -22,6 +23,16 @@ internal sealed class UiSettings
     public Dictionary<string, List<string>> IgnoreFieldsByFile { get; set; } =
         new(StringComparer.OrdinalIgnoreCase);
 
+    /// <summary>Saved template slot geometry by template name.</summary>
+    public Dictionary<string, List<TemplateSlotOverrideDto>> TemplateLayouts { get; set; } =
+        new(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>Template names whose saved layout replaces code defaults (not overlay).</summary>
+    public List<string> TemplateLayoutsReplaceBase { get; set; } = [];
+
+    /// <summary>User-created templates (from document tree branches).</summary>
+    public List<UserTemplateDefinitionDto> UserTemplates { get; set; } = [];
+
     public static string GetSettingsPath()
     {
         string dir = Path.Combine(
@@ -33,37 +44,66 @@ internal sealed class UiSettings
 
     public static UiSettings Load()
     {
+        var loaded = ReadFile() ?? new UiSettings();
+        ApplyStores(loaded);
+        return loaded;
+    }
+
+    /// <summary>Write current in-memory stores to disk without reloading (wiping) them first.</summary>
+    public static void PersistStores()
+    {
+        var settings = ReadFile() ?? new UiSettings();
+        settings.Save();
+    }
+
+    private static UiSettings? ReadFile()
+    {
         try
         {
             string path = GetSettingsPath();
             if (!File.Exists(path))
-                return new UiSettings();
+                return null;
 
             string json = File.ReadAllText(path);
             var loaded = JsonSerializer.Deserialize<UiSettings>(json, JsonOptions);
             if (loaded is null)
-                return new UiSettings();
+                return null;
 
             loaded.IgnoreFieldsByFile ??= new Dictionary<string, List<string>>(StringComparer.OrdinalIgnoreCase);
             loaded.IgnoreFields ??= [];
+            loaded.TemplateLayouts ??= new Dictionary<string, List<TemplateSlotOverrideDto>>(StringComparer.OrdinalIgnoreCase);
+            loaded.TemplateLayoutsReplaceBase ??= [];
+            loaded.UserTemplates ??= [];
 
-            // Re-create dictionary with case-insensitive comparer (JSON deserializer uses default)
             loaded.IgnoreFieldsByFile = new Dictionary<string, List<string>>(
                 loaded.IgnoreFieldsByFile,
+                StringComparer.OrdinalIgnoreCase
+            );
+            loaded.TemplateLayouts = new Dictionary<string, List<TemplateSlotOverrideDto>>(
+                loaded.TemplateLayouts,
                 StringComparer.OrdinalIgnoreCase
             );
             return loaded;
         }
         catch
         {
-            return new UiSettings();
+            return null;
         }
+    }
+
+    private static void ApplyStores(UiSettings loaded)
+    {
+        TemplateLayoutStore.Load(loaded.TemplateLayouts, loaded.TemplateLayoutsReplaceBase);
+        UserTemplateStore.Load(loaded.UserTemplates);
     }
 
     public void Save()
     {
         try
         {
+            TemplateLayouts = TemplateLayoutStore.ToDictionary();
+            TemplateLayoutsReplaceBase = TemplateLayoutStore.ToReplaceBaseList();
+            UserTemplates = UserTemplateStore.ToList();
             string path = GetSettingsPath();
             Directory.CreateDirectory(Path.GetDirectoryName(path)!);
             File.WriteAllText(path, JsonSerializer.Serialize(this, JsonOptions));
