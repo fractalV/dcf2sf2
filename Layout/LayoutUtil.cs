@@ -137,27 +137,66 @@ internal static class LayoutUtil
         return Consts.DefaultHeightData * Math.Max(1, rows);
     }
 
-    public static int LayoutFlowRow(Block block, List<Data> fields, int baseX, int y, int maxWidth)
+    public static int LayoutFlowRow(
+        Block block,
+        List<Data> fields,
+        int baseX,
+        int y,
+        int maxWidth,
+        bool includeFieldComments = true
+    )
     {
+        if (fields.Count == 0)
+            return y;
+
         int x = baseX;
+        int rowH = Consts.DefaultHeightData;
+        const int gap = 4;
+        int right = baseX + Math.Max(maxWidth, 16);
+
         foreach (var f in fields)
         {
-            int w = Math.Min(WidthFor(f, 120), maxWidth);
-            if (x + w > baseX + maxWidth)
+            int h = HeightFor(f);
+            int naturalW = NaturalWidth(f);
+            bool wantsPict = ShouldAddPict(f.FieldElement.ElementName, f.FieldElement.ElementValue);
+            int pictReserve = wantsPict ? PictSize + PictGap : 0;
+            int maxFieldW = Math.Max(16, right - baseX - pictReserve);
+
+            // Wrap when the field (at its natural size) does not fit on the current row.
+            if (x > baseX && x + Math.Min(naturalW, maxFieldW) + pictReserve + gap > right)
             {
                 x = baseX;
-                y += Consts.DefaultHeightData + 4;
+                y += rowH + gap;
+                rowH = Consts.DefaultHeightData;
             }
 
-            string label = ExtractComment(f.FieldElement.ElementValue);
-            string last = GetLastToken(f.FieldElement.ElementName);
-            string? shortL = ShortLabelOrNull(last);
-            block.Fields.Add(DataField(f, x, y, w, HeightFor(f), shortL ?? (label.Length > 40 ? null : label)));
+            int remain = Math.Max(16, right - x - pictReserve);
+            int w = Math.Min(naturalW, remain);
+
+            string? dataLabel = null;
+            if (includeFieldComments)
+            {
+                string label = ExtractComment(f.FieldElement.ElementValue);
+                string last = GetLastToken(f.FieldElement.ElementName);
+                string? shortL = ShortLabelOrNull(last);
+                dataLabel = shortL ?? (label.Length > 0 && label.Length < 80 ? label : null);
+            }
+
+            block.Fields.Add(DataField(f, x, y, w, h, dataLabel));
             int pictExtra = MaybeAddPict(block, f, x, y, w);
-            x += w + 4 + pictExtra;
+            x += w + gap + pictExtra;
+            rowH = Math.Max(rowH, h);
         }
 
-        return y + Consts.DefaultHeightData + 8;
+        return y + rowH + 8;
+    }
+
+    public static int NaturalWidth(Data f)
+    {
+        var t = FieldTypeParser.Parse(f.FieldElement.ElementValue);
+        if (!t.IsValid || t.IsBlock)
+            return 80;
+        return Math.Clamp(FieldTypeParser.DisplayWidth(t), 16, Consts.DefaultWidthBlock);
     }
 
     public static Data? FindBySuffix(IEnumerable<Data> fields, string suffix) =>
@@ -191,11 +230,97 @@ internal static class LayoutUtil
             _ => suffix,
         };
 
+    /// <summary>Default SF2 Data comment (after '`') for built-in template field suffixes.</summary>
+    public static string DefaultFieldComment(string suffix, string? group = null)
+    {
+        string g = group ?? string.Empty;
+        if (suffix.Equals("OrganizationName", StringComparison.OrdinalIgnoreCase))
+        {
+            if (g.Equals("IdentityCard", StringComparison.OrdinalIgnoreCase))
+                return "Наименование организации, выдавшей документ";
+            return "Наименование организации";
+        }
+
+        if (suffix.Equals("CountryCode", StringComparison.OrdinalIgnoreCase)
+            && g.Equals("IdentityCard", StringComparison.OrdinalIgnoreCase))
+            return "Код страны выдачи документа, удостоверяющего личность";
+
+        return suffix.ToUpperInvariant() switch
+        {
+            "COUNTRYCODE" => "Буквенный код страны в соответствии с классификатором стран мира",
+            "COUNRYNAME" => "Краткое название страны в соответствии с классификатором стран мира",
+            "POSTALCODE" => "Почтовый индекс",
+            "REGION" => "Регион (Наименование единицы административно-территориального деления первого уровня)",
+            "CITY" => "Населенный пункт",
+            "STREETHOUSE" => "Улица (Наименование элемента улично-дорожной сети городской инфраструктуры)",
+            "ADDRESSKINDCODE" =>
+                "Кодовое обозначение вида адреса: \"1\" - адрес регистрации; \"2\" - фактический адрес; \"3\" - почтовый адрес",
+            "DISTRICT" => "Район (Наименование единицы административно-территориального деления второго уровня)",
+            "TOWN" => "Город",
+            "HOUSE" => "Обозначение дома, корпуса, строения",
+            "ROOM" => "Обозначение офиса или квартиры",
+            "ADDRESSTEXT" => "Набор элементов адреса, представленных в свободной форме в виде текста.",
+            "POSTOFFICEBOXID" => "Номер абонентского ящика",
+            "SHORTNAME" => "Краткое наименование организации",
+            "OGRN" => "ОГРН/ОГРНИП. Основной государственный регистрационный номер",
+            "INN" => "ИНН - Индивидуальный номер налогоплательщика",
+            "KPP" => "КПП - Код причины постановки на учет",
+            "OKPOID" => "ОКПО",
+            "OKATOCODE" => "ОКАТО",
+            "PHONE" => "Номер телефона",
+            "FAX" => "Номер факса",
+            "TELEX" => "Номер телекса",
+            "E_MAIL" or "MAIL" => "Адрес электронной почты",
+            "BIN" => "БИН",
+            "IIN" => "ИИН",
+            "UNP" => "УНП",
+            "UNN" => "УНН",
+            "KGINN" => "ПИН",
+            "KGOKPO" => "ОКПО",
+            "IDENTITYCARDCODE" =>
+                "Код вида документа, удостоверяющего личность, в соответствии с классификатором видов документов, удостоверяющих личность",
+            "IDENTITYCARDNAME" => "Краткое наименование документа, удостоверяющего личность",
+            "FULLIDENTITYCARDNAME" => "Полное наименование документа, удостоверяющего личность",
+            "IDENTITYCARDSERIES" => "Серия документа, удостоверяющего личность",
+            "IDENTITYCARDNUMBER" => "Номер документа, удостоверяющего личность",
+            "IDENTITYCARDDATE" => "Дата выдачи документа, удостоверяющего личность",
+            "DOCVALIDITYDATE" => "Дата окончания срока, в течение которого документ имеет силу",
+            "ISSUERCODE" => "Код подразделения органа, выдавшего документ, удостоверяющий личность",
+            "AUTHORITYID" =>
+                "Строка, идентифицирующая орган государственной власти государства-члена либо уполномоченную им организацию, выдавшую документ",
+            "CUSTOMSCODE" => "Код таможенного органа, зарегистрировавшего документ",
+            "REGISTRATIONDATE" => "Дата регистрации документа",
+            "GTDNUMBER" => "Порядковый номер документа по журналу регистрации",
+            "CODE" => "Номер (идентификатор) вносимых изменений и (или) дополнений",
+            "TRANSPORTMODECODE" =>
+                "Код вида транспортного средства по классификатору видов транспорта и транспортировки товаров",
+            "PRECEDINGDOCUMENTMODECODE" => "Кодовое обозначение вида документа",
+            "PRECEDINGDOCUMENTNAME" => "Наименование предшествующего документа",
+            "PRECEDINGDOCUMENTGOODSNUMERIC" => "Порядковый номер товара в предшествующем документе",
+            "PRECEDINGDOCUMENTNUM" => "Номер предшествующего документа",
+            "OTHERPRDOCUMENTNUMBER" => "Номер иного предшествующего документа",
+            "OTHERPRDOCUMENTDATE" => "Дата иного предшествующего документа",
+            "GOODSQUANTITY" => "Количество товара в единице измерения",
+            "MEASUREUNITQUALIFIERNAME" => "Условное обозначение единицы измерения",
+            "MEASUREUNITQUALIFIERCODE" =>
+                "Код единицы измерения в соответствии с единицами измерения, применяемыми в ТН ВЭД ЕАЭС",
+            "TIRID" => "Номер книжки МДП",
+            "TIRSERIES" => "Серия книжки МДП",
+            _ => ShortLabelOrNull(suffix) ?? string.Empty,
+        };
+    }
+
     public static string? ShortLabelOrNull(string suffix)
     {
         string s = ShortLabel(suffix);
         return s == suffix ? null : s;
     }
+
+    /// <summary>Horizontal space after a Data field before the next sibling (gap + optional Pict).</summary>
+    public static int AdvanceAfterData(int fieldWidth, string suffixOrLastToken, int fieldGap = 4) =>
+        Math.Max(fieldWidth, 16)
+        + fieldGap
+        + (ShouldAddPict(suffixOrLastToken) ? PictSize + PictGap : 0);
 
     public static int PlaceCompactRow(
         Block block,

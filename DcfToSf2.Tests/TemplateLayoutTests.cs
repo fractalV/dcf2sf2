@@ -66,6 +66,27 @@ public class TemplateLayoutTests
     }
 
     [Fact]
+    public void AddressPreview_PictDoesNotOverlapNextData()
+    {
+        TemplateLayoutStore.ClearTemplate(AddressFieldGroupTemplate.TemplateName);
+        var slots = new AddressFieldGroupTemplate().GetPreviewSlots([]);
+
+        var code = slots.First(s =>
+            s.Kind == TemplateSlotKind.Data && s.Suffix == "CountryCode" && !s.IsExcluded
+        );
+        var pict = slots.First(s =>
+            s.Kind == TemplateSlotKind.Pict && s.Suffix == "CountryCode" && !s.IsExcluded
+        );
+        var name = slots.First(s =>
+            s.Kind == TemplateSlotKind.Data && s.Suffix == "CounryName" && !s.IsExcluded
+        );
+
+        Assert.Equal(code.Y, name.Y);
+        Assert.True(pict.X >= code.X + code.Width + LayoutUtil.PictGap);
+        Assert.True(name.X >= pict.X + pict.Width + 4);
+    }
+
+    [Fact]
     public void AddressTemplate_IgnorePostalCode_CompactsRow()
     {
         var fields = new List<Data>
@@ -252,6 +273,99 @@ public class TemplateLayoutTests
     }
 
     [Fact]
+    public void TemplatePreviewText_Apply_UpdatesDataXFromText()
+    {
+        var slots = new AddressFieldGroupTemplate().GetDefaultPreviewSlots([]).Select(s => s.Clone()).ToList();
+        var country = slots.First(s => s.Suffix == "CountryCode" && s.Kind == TemplateSlotKind.Data);
+        string text = TemplatePreviewText.Render(slots);
+        string patched = string.Join(
+            "\n",
+            text.Replace("\r\n", "\n")
+                .Split('\n')
+                .Select(l =>
+                    l.StartsWith("Data", StringComparison.Ordinal) && l.Contains("CountryCode", StringComparison.Ordinal)
+                        ? $"Data         200    80    32   16 CountryCode `{country.Comment}"
+                        : l
+                )
+        );
+        var result = TemplatePreviewText.ApplyToSlots(patched, slots);
+        Assert.True(result.Updated > 0);
+        Assert.Equal(200, country.X);
+        Assert.Equal(80, country.Y);
+    }
+
+    [Fact]
+    public void TemplatePreviewText_Render_ReflectsCanvasMovedX()
+    {
+        var slots = new AddressFieldGroupTemplate().GetDefaultPreviewSlots([]).Select(s => s.Clone()).ToList();
+        var country = slots.First(s => s.Suffix == "CountryCode" && s.Kind == TemplateSlotKind.Data);
+        country.X = 200;
+        country.Y = 80;
+        string text = TemplatePreviewText.Render(slots);
+        string line = Assert.Single(
+            text.Replace("\r\n", "\n").Split('\n'),
+            l => l.StartsWith("Data", StringComparison.Ordinal) && l.Contains("CountryCode", StringComparison.Ordinal)
+        );
+        Assert.Contains("200", line, StringComparison.Ordinal);
+        Assert.Contains("80", line, StringComparison.Ordinal);
+        // Ensure X is the slot X (baseX + slot.X - OriginX == slot.X when base==origin)
+        Assert.Matches(@"Data\s+200\s+80\s+", line);
+    }
+
+    [Fact]
+    public void BuiltInTemplates_DefaultSlots_HaveFieldComments()
+    {
+        var addr = new AddressFieldGroupTemplate().GetDefaultPreviewSlots([]);
+        var country = Assert.Single(addr, s => s.Suffix == "CountryCode" && s.Kind == TemplateSlotKind.Data);
+        Assert.Contains("стран", country.Comment, StringComparison.OrdinalIgnoreCase);
+
+        var org = new OrganizationFieldGroupTemplate().GetDefaultPreviewSlots([]);
+        Assert.Equal("Наименование организации", org.First(s => s.Suffix == "OrganizationName").Comment);
+        Assert.Contains("ИНН", org.First(s => s.Suffix == "INN").Comment, StringComparison.Ordinal);
+
+        var id = new IdentityCardFieldGroupTemplate().GetDefaultPreviewSlots([]);
+        Assert.Contains("выдавшей", id.First(s => s.Suffix == "OrganizationName").Comment, StringComparison.Ordinal);
+
+        string text = TemplatePreviewText.Render(addr);
+        Assert.Contains($"{Consts.SpecialDelimetr}Почтовый индекс", text, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void TemplatePreviewText_DataComment_RoundTripsAndPersists()
+    {
+        TemplateLayoutStore.ClearTemplate(AddressFieldGroupTemplate.TemplateName);
+        var slots = new AddressFieldGroupTemplate().GetDefaultPreviewSlots([]).Select(s => s.Clone()).ToList();
+        var country = slots.First(s => s.Suffix == "CountryCode" && s.Kind == TemplateSlotKind.Data);
+        string line =
+            $"Data{country.X,12}{country.Y,6}{country.Width,6}{country.Height,5} CountryCode {Consts.SpecialDelimetr}код страны";
+        // Keep other Data lines so Apply does not dismiss unrelated slots.
+        string text = TemplatePreviewText.Render(slots);
+        text = string.Join(
+            "\n",
+            text.Split('\n')
+                .Select(l =>
+                    l.Contains("CountryCode", StringComparison.Ordinal)
+                    && l.TrimStart().StartsWith("Data", StringComparison.Ordinal)
+                        ? line
+                        : l
+                )
+        );
+
+        var result = TemplatePreviewText.ApplyToSlots(text, slots);
+        Assert.True(result.Updated > 0);
+        Assert.Equal("код страны", country.Comment);
+
+        string rendered = TemplatePreviewText.Render(slots);
+        Assert.Contains($"{Consts.SpecialDelimetr}код страны", rendered, StringComparison.Ordinal);
+
+        TemplateLayoutStore.SaveTemplate(AddressFieldGroupTemplate.TemplateName, slots);
+        var reloaded = new AddressFieldGroupTemplate().GetPreviewSlots([]);
+        var got = reloaded.First(s => s.Suffix == "CountryCode" && s.Kind == TemplateSlotKind.Data);
+        Assert.Equal("код страны", got.Comment);
+        TemplateLayoutStore.ClearTemplate(AddressFieldGroupTemplate.TemplateName);
+    }
+
+    [Fact]
     public void TemplatePreviewText_Render_ShowsRemovedPrefix()
     {
         var slots = new AddressFieldGroupTemplate().GetDefaultPreviewSlots([]).Select(s => s.Clone()).ToList();
@@ -265,6 +379,65 @@ public class TemplateLayoutTests
             text.Split('\n').Where(l => !l.StartsWith("REMOVED", StringComparison.Ordinal)),
             l => l.Contains("PostalCode", StringComparison.Ordinal) && l.StartsWith("Data", StringComparison.Ordinal)
         );
+    }
+
+    [Fact]
+    public void TemplatePreviewText_Render_ShowsIgnoredPrefix()
+    {
+        var ignore = ConversionOptions.ParseIgnoreFields("*PostalCode");
+        var slots = new AddressFieldGroupTemplate().GetDefaultPreviewSlots(ignore).Select(s => s.Clone()).ToList();
+        Assert.Contains(slots, s => s.Suffix == "PostalCode" && s.IsIgnored);
+
+        string text = TemplatePreviewText.Render(slots);
+        Assert.Contains("IGNORED Data", text, StringComparison.Ordinal);
+        Assert.Contains("PostalCode", text, StringComparison.Ordinal);
+        Assert.DoesNotContain(
+            text.Split('\n').Where(l => !l.StartsWith("IGNORED", StringComparison.OrdinalIgnoreCase)),
+            l => l.Contains("PostalCode", StringComparison.Ordinal) && l.TrimStart().StartsWith("Data", StringComparison.Ordinal)
+        );
+    }
+
+    [Fact]
+    public void TemplatePreviewText_Apply_DeletingIgnoredLineDismissesSlot()
+    {
+        var ignore = ConversionOptions.ParseIgnoreFields("*PostalCode");
+        var slots = new AddressFieldGroupTemplate().GetDefaultPreviewSlots(ignore).Select(s => s.Clone()).ToList();
+        var postal = slots.First(s => s.Suffix == "PostalCode");
+        Assert.True(postal.IsIgnored);
+
+        string text = TemplatePreviewText.Render(slots);
+        Assert.Contains("IGNORED", text, StringComparison.OrdinalIgnoreCase);
+
+        string withoutIgnored = string.Join(
+            '\n',
+            text.Replace("\r\n", "\n")
+                .Split('\n')
+                .Where(l => !l.StartsWith("IGNORED", StringComparison.OrdinalIgnoreCase))
+        );
+        TemplatePreviewText.ApplyToSlots(withoutIgnored, slots);
+
+        Assert.True(postal.IsRemoved);
+        string after = TemplatePreviewText.Render(slots);
+        Assert.DoesNotContain("PostalCode", after, StringComparison.Ordinal);
+        Assert.DoesNotContain("IGNORED", after, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void TemplatePreviewText_Apply_CreatesNewTextSlot()
+    {
+        var slots = new AddressFieldGroupTemplate().GetDefaultPreviewSlots([]).Select(s => s.Clone()).ToList();
+        int before = slots.Count(s => s.Kind == TemplateSlotKind.Text);
+
+        string text = TemplatePreviewText.Render(slots);
+        text += $"\nText         20    80    80   12 {Consts.SpecialDelimetr}Заголовок секции";
+
+        var result = TemplatePreviewText.ApplyToSlots(text, slots);
+        Assert.True(result.Updated > 0);
+        Assert.Equal(before + 1, slots.Count(s => s.Kind == TemplateSlotKind.Text));
+        var created = slots.Last(s => s.Kind == TemplateSlotKind.Text && s.IsEmbedded);
+        Assert.Equal("Заголовок секции", created.Label);
+        Assert.Equal(20, created.X);
+        Assert.Equal(80, created.Y);
     }
 
     [Fact]
@@ -297,6 +470,75 @@ public class TemplateLayoutTests
 
         TemplatePreviewText.ApplyToSlots(string.Join("\n", lines), slots);
         Assert.True(slots.First(s => s.Suffix == "PostalCode").IsRemoved);
+    }
+
+    [Fact]
+    public void TemplateLayoutStore_ReplaceBase_KeepsRemovedPictTombstones()
+    {
+        TemplateLayoutStore.ClearTemplate(AddressFieldGroupTemplate.TemplateName);
+        var tpl = new AddressFieldGroupTemplate();
+        var slots = tpl.GetPreviewSlots([]).Select(s => s.Clone()).ToList();
+        var pict = slots.First(s => s.Kind == TemplateSlotKind.Pict && s.Suffix == "CountryCode");
+        pict.IsRemoved = true;
+
+        TemplateLayoutStore.SaveTemplate(AddressFieldGroupTemplate.TemplateName, slots, replaceBase: true);
+        Assert.True(TemplateLayoutStore.IsReplaceBase(AddressFieldGroupTemplate.TemplateName));
+
+        var applied = tpl.GetPreviewSlots([]);
+        var got = Assert.Single(applied, s => s.Kind == TemplateSlotKind.Pict && s.Suffix == "CountryCode");
+        Assert.True(got.IsRemoved);
+
+        // Must not reappear as an active or REMOVED pict line in text preview.
+        string text = TemplatePreviewText.Render(applied);
+        Assert.DoesNotContain(
+            text.Replace("\r\n", "\n").Split('\n'),
+            l =>
+                l.Contains("Pict", StringComparison.Ordinal)
+                && l.Contains("CountryCode", StringComparison.Ordinal)
+        );
+
+        TemplateLayoutStore.ClearTemplate(AddressFieldGroupTemplate.TemplateName);
+    }
+
+    [Fact]
+    public void TemplatePreviewText_Apply_DeletingPictLineRemovesPict()
+    {
+        TemplateLayoutStore.ClearTemplate(AddressFieldGroupTemplate.TemplateName);
+        var slots = new AddressFieldGroupTemplate().GetPreviewSlots([]).Select(s => s.Clone()).ToList();
+        var pict = slots.First(s => s.Kind == TemplateSlotKind.Pict && s.Suffix == "CountryCode");
+        Assert.False(pict.IsRemoved);
+
+        string text = TemplatePreviewText.Render(slots);
+        string withoutPict = string.Join(
+            '\n',
+            text.Replace("\r\n", "\n")
+                .Split('\n')
+                .Where(l =>
+                    !(
+                        l.StartsWith("Pict", StringComparison.Ordinal)
+                        && l.Contains("CountryCode", StringComparison.Ordinal)
+                    )
+                )
+        );
+
+        TemplatePreviewText.ApplyToSlots(withoutPict, slots);
+        Assert.True(pict.IsRemoved);
+
+        // Apply refresh must not resurrect REMOVED Pict lines.
+        string after = TemplatePreviewText.Render(slots);
+        Assert.DoesNotContain(
+            after.Replace("\r\n", "\n").Split('\n'),
+            l =>
+                l.Contains("Pict", StringComparison.Ordinal)
+                && l.Contains("CountryCode", StringComparison.Ordinal)
+        );
+
+        TemplateLayoutStore.SaveTemplate(AddressFieldGroupTemplate.TemplateName, slots, replaceBase: true);
+        var reloaded = new AddressFieldGroupTemplate().GetPreviewSlots([]);
+        Assert.True(
+            reloaded.First(s => s.Kind == TemplateSlotKind.Pict && s.Suffix == "CountryCode").IsRemoved
+        );
+        TemplateLayoutStore.ClearTemplate(AddressFieldGroupTemplate.TemplateName);
     }
 
     [Fact]
@@ -458,6 +700,368 @@ public class TemplateLayoutTests
     }
 
     [Fact]
+    public void TemplateSlotLayout_Pict_DoesNotEmitEmbedStemHint()
+    {
+        var fields = new List<Data>
+        {
+            Field("DeclarantDetails_IdentityCard_IdentityCardDate", "D10 |Дата", "MAIN"),
+            Field("DeclarantDetails_IdentityCard_IdentityCardCode", "C2 |Код", "MAIN"),
+        };
+
+        var slots = new List<TemplateSlot>
+        {
+            new()
+            {
+                Id = TemplateSlot.MakeId(TemplateSlotKind.Data, "IdentityCard", "IdentityCardDate", "embed:2"),
+                Suffix = "IdentityCardDate",
+                Kind = TemplateSlotKind.Data,
+                X = 100,
+                Y = 40,
+                Width = 84,
+                Height = 16,
+                Group = "IdentityCard",
+                StemHint = "embed:2",
+                IsEmbedded = true,
+            },
+            new()
+            {
+                Id = TemplateSlot.MakeId(TemplateSlotKind.Pict, "IdentityCard", "IdentityCardDate", "embed:2"),
+                Suffix = "IdentityCardDate",
+                Label = "embed:2_IdentityCardDate=DATE",
+                Kind = TemplateSlotKind.Pict,
+                X = 190,
+                Y = 42,
+                Width = 12,
+                Height = 12,
+                Group = "IdentityCard",
+                StemHint = "embed:2",
+                IsEmbedded = true,
+            },
+        };
+
+        var block = new Block { Name = "MAIN" };
+        TemplateSlotLayout.Apply(block, fields, slots, 4, 4, 770);
+
+        var picts = block.Fields.Where(f => f.FieldType == Type.Pict).ToList();
+        Assert.NotEmpty(picts);
+        Assert.All(picts, p => Assert.DoesNotContain("embed:", p.FieldValue.ToString(), StringComparison.OrdinalIgnoreCase));
+        Assert.Contains(
+            picts,
+            p => p.FieldValue.ToString().Contains("DeclarantDetails_IdentityCard_IdentityCardDate", StringComparison.Ordinal)
+        );
+    }
+
+    [Fact]
+    public void ContactTemplate_LayoutsCommunicationDetails_WithoutOrphanOrgLabels()
+    {
+        var fields = new List<Data>
+        {
+            Field("Carrier_CommunicationDetails_Phone", "C250 24 |телефон SEQ=2", "MAIN"),
+            Field("Carrier_CommunicationDetails_Fax", "C24 |факс", "MAIN"),
+            Field("Carrier_CommunicationDetails_Telex", "C24 |телекс", "MAIN"),
+            Field("Carrier_CommunicationDetails_E_mail", "C250 50 |email SEQ=1", "MAIN"),
+        };
+
+        var block = new Block { Name = "MAIN" };
+        int y = ContactFieldGroupTemplate.LayoutContactFields(block, fields, 4, 4, 770, []);
+        Assert.True(y > 4);
+
+        var data = block.Fields.Where(f => f.FieldType == Type.Data).ToList();
+        Assert.Equal(4, data.Count);
+        Assert.DoesNotContain(block.Fields, f => f.FieldType == Type.Text && f.FieldValue.ToString().Contains("ИНН"));
+        Assert.Contains(data, f => f.FieldValue.Name.Contains("Phone", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains(data, f => f.FieldValue.Name.Contains("E_mail", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public void FindField_AddressCountryCode_DoesNotStealIdentityCard()
+    {
+        var fields = new List<Data>
+        {
+            Field("ConsignorDetails_IdentityCard_CountryCode", "C2 |Кодовое обозначение страны", "MAIN"),
+            Field("ConsignorDetails_Address_PostalCode", "C9 |индекс", "MAIN"),
+        };
+
+        var addressSlot = new TemplateSlot
+        {
+            Id = "Data:Address:CountryCode",
+            Suffix = "CountryCode",
+            Kind = TemplateSlotKind.Data,
+            X = 4,
+            Y = 4,
+            Width = 32,
+            Height = 16,
+            Group = AddressFieldGroupTemplate.TemplateName,
+        };
+        var idSlot = new TemplateSlot
+        {
+            Id = "Data:IdentityCard:CountryCode",
+            Suffix = "CountryCode",
+            Kind = TemplateSlotKind.Data,
+            X = 100,
+            Y = 4,
+            Width = 20,
+            Height = 16,
+            Group = IdentityCardFieldGroupTemplate.TemplateName,
+        };
+
+        Assert.Null(TemplateSlotLayout.FindField(fields, addressSlot));
+        Assert.Equal(
+            "ConsignorDetails_IdentityCard_CountryCode",
+            TemplateSlotLayout.FindField(fields, idSlot)!.FieldElement.ElementName
+        );
+    }
+
+    [Fact]
+    public void ContactTemplate_MissingOverrideSlot_KeepsCompactEmailWidth()
+    {
+        TemplateLayoutStore.ClearTemplate(ContactFieldGroupTemplate.TemplateName);
+        // Saved Contact layout without E_mail slot
+        var partial = new ContactFieldGroupTemplate()
+            .GetDefaultPreviewSlots([])
+            .Where(s => !s.Suffix.Equals("E_mail", StringComparison.OrdinalIgnoreCase))
+            .Select(s => s.Clone())
+            .ToList();
+        TemplateLayoutStore.SaveTemplate(ContactFieldGroupTemplate.TemplateName, partial);
+
+        try
+        {
+            var fields = new List<Data>
+            {
+                Field("X_Phone", "C20 |тел", "MAIN"),
+                Field("X_Fax", "C20 |факс", "MAIN"),
+                Field("X_Telex", "C20 |телекс", "MAIN"),
+                Field("X_E_mail", "C250 50 |email", "MAIN"),
+            };
+            var block = new Block { Name = "MAIN" };
+            ContactFieldGroupTemplate.LayoutContactFields(block, fields, 4, 4, 770, []);
+
+            var email = block.Fields.First(f =>
+                f.FieldType == Type.Data && f.FieldValue.Name.Contains("E_mail", StringComparison.OrdinalIgnoreCase)
+            );
+            Assert.True(email.FieldSize.Length <= 240, $"E_mail width {email.FieldSize.Length} should stay compact");
+        }
+        finally
+        {
+            TemplateLayoutStore.ClearTemplate(ContactFieldGroupTemplate.TemplateName);
+        }
+    }
+
+    [Fact]
+    public void ContactFlattenToSingleRow_SnapsEmailBesidePhone()
+    {
+        var slots = new List<TemplateSlot>
+        {
+            new()
+            {
+                Id = "Data:Contact:Phone",
+                Suffix = "Phone",
+                Kind = TemplateSlotKind.Data,
+                X = 20,
+                Y = 4,
+                Width = 200,
+                Height = 16,
+                Group = "Contact",
+            },
+            new()
+            {
+                Id = "Text:Contact:t",
+                Suffix = "t",
+                Label = "т.",
+                Kind = TemplateSlotKind.Text,
+                X = 4,
+                Y = 8,
+                Width = 40,
+                Height = 12,
+                Group = "Contact",
+            },
+            new()
+            {
+                Id = "Text:Contact:email",
+                Suffix = "email",
+                Label = "e-mail",
+                Kind = TemplateSlotKind.Text,
+                X = 224,
+                Y = 8,
+                Width = 40,
+                Height = 12,
+                Group = "Contact",
+            },
+            new()
+            {
+                Id = "Data:Contact:E_mail",
+                Suffix = "E_mail",
+                Kind = TemplateSlotKind.Data,
+                X = 4,
+                Y = 24,
+                Width = 240,
+                Height = 16,
+                Group = "Contact",
+            },
+        };
+
+        var flat = ContactFieldGroupTemplate.FlattenToSingleRow(slots);
+        var phone = flat.First(s => s.Suffix == "Phone");
+        var email = flat.First(s => s.Suffix == "E_mail");
+        Assert.Equal(phone.Y, email.Y);
+        Assert.True(email.X >= phone.X + phone.Width);
+    }
+
+    [Fact]
+    public void CompactAbsentRows_ClosesGapWhenContactMissing()
+    {
+        var slots = new List<TemplateSlot>
+        {
+            new()
+            {
+                Id = "Data:Organization:INN",
+                Suffix = "INN",
+                Kind = TemplateSlotKind.Data,
+                X = 276,
+                Y = 28,
+                Width = 80,
+                Height = 16,
+                Group = "Organization",
+            },
+            new()
+            {
+                Id = "Data:Contact:Phone",
+                Suffix = "Phone",
+                Kind = TemplateSlotKind.Data,
+                X = 4,
+                Y = 52,
+                Width = 200,
+                Height = 16,
+                Group = "Contact",
+            },
+            new()
+            {
+                Id = "Text:Contact:phone",
+                Suffix = "phone",
+                Label = "Т.",
+                Kind = TemplateSlotKind.Text,
+                X = 4,
+                Y = 56,
+                Width = 16,
+                Height = 12,
+                Group = "Contact",
+            },
+            new()
+            {
+                Id = "Data:IdentityCard:IdentityCardCode",
+                Suffix = "IdentityCardCode",
+                Kind = TemplateSlotKind.Data,
+                X = 4,
+                Y = 80,
+                Width = 44,
+                Height = 16,
+                Group = "IdentityCard",
+            },
+        };
+
+        var fields = new List<Data>
+        {
+            Field("Org_INN", "C12 |", "MAIN"),
+            Field("Org_IdentityCard_IdentityCardCode", "C20 |", "MAIN"),
+            // Phone absent
+        };
+
+        var compact = TemplateSlotLayout.CompactAbsentRows(slots, fields);
+        var inn = compact.First(s => s.Suffix == "INN");
+        var id = compact.First(s => s.Suffix == "IdentityCardCode");
+        Assert.DoesNotContain(compact, s => s.Suffix == "Phone");
+        Assert.DoesNotContain(compact, s => s.Kind == TemplateSlotKind.Text);
+        Assert.True(
+            id.Y - (inn.Y + inn.Height) <= Consts.DefaultHeightData + 12,
+            $"Gap too large: INN Y={inn.Y}h={inn.Height}, ID Y={id.Y}"
+        );
+    }
+
+    [Fact]
+    public void CompactAbsentRows_DoesNotCollapseIdentityCardOntoShortName()
+    {
+        // Mirrors saved Organization layout: ShortName, then Contact + several Address rows,
+        // then IdentityCard. When Contact/Address are absent from DCF, Id must not land on ShortName.
+        var slots = new List<TemplateSlot>
+        {
+            DataSlot("Organization", "ShortName", 4, 20, 240),
+            DataSlot("Contact", "Phone", 4, 40, 200),
+            DataSlot("Address", "CountryCode", 24, 60, 32),
+            DataSlot("Address", "PostalCode", 216, 60, 80),
+            DataSlot("Address", "Region", 1700, 68, 80),
+            DataSlot("Address", "City", 216, 80, 120),
+            DataSlot("Address", "StreetHouse", 4, 100, 200),
+            DataSlot("Address", "AddressText", 4, 120, 400),
+            DataSlot("IdentityCard", "IdentityCardCode", 4, 140, 24),
+            DataSlot("IdentityCard", "IdentityCardName", 48, 140, 124),
+        };
+
+        var fields = new List<Data>
+        {
+            Field("ConsignorDetails_ShortName", "C150 |", "MAIN"),
+            Field("ConsignorDetails_IdentityCard_IdentityCardCode", "C20 |", "MAIN"),
+            Field("ConsignorDetails_IdentityCard_IdentityCardName", "C40 |", "MAIN"),
+        };
+
+        var compact = TemplateSlotLayout.CompactAbsentRows(slots, fields);
+        var shortName = compact.First(s => s.Suffix == "ShortName");
+        var idCode = compact.First(s => s.Suffix == "IdentityCardCode");
+        Assert.True(
+            idCode.Y >= shortName.Y + shortName.Height,
+            $"IdentityCardCode Y={idCode.Y} collided with ShortName Y={shortName.Y}"
+        );
+    }
+
+    private static TemplateSlot DataSlot(string group, string suffix, int x, int y, int width) =>
+        new()
+        {
+            Id = TemplateSlot.MakeId(TemplateSlotKind.Data, group, suffix),
+            Suffix = suffix,
+            Kind = TemplateSlotKind.Data,
+            X = x,
+            Y = y,
+            Width = width,
+            Height = Consts.DefaultHeightData,
+            Group = group,
+        };
+
+    [Fact]
+    public void PlaceTextLabelsBeforeData_MovesLabelLeftOfField()
+    {
+        var slots = new List<TemplateSlot>
+        {
+            new()
+            {
+                Id = "Text:Contact:email",
+                Suffix = "email",
+                Label = "e-mail",
+                Kind = TemplateSlotKind.Text,
+                X = 224,
+                Y = 8,
+                Width = 40,
+                Height = 12,
+                Group = "Contact",
+            },
+            new()
+            {
+                Id = "Data:Contact:E_mail",
+                Suffix = "E_mail",
+                Kind = TemplateSlotKind.Data,
+                X = 224,
+                Y = 4,
+                Width = 240,
+                Height = 16,
+                Group = "Contact",
+            },
+        };
+
+        ContactFieldGroupTemplate.PlaceTextLabelsBeforeData(slots);
+        var text = slots.First(s => s.Kind == TemplateSlotKind.Text);
+        var data = slots.First(s => s.Kind == TemplateSlotKind.Data);
+        Assert.True(text.X + text.Width <= data.X, $"Text X={text.X} w={text.Width} should end before Data X={data.X}");
+    }
+
+    [Fact]
     public void LayoutUtil_ShouldAddPict_MatchesCodeInnDate()
     {
         Assert.True(LayoutUtil.ShouldAddPict("CountryCode"));
@@ -512,6 +1116,71 @@ public class TemplateLayoutTests
         var block = new Block { Name = "MAIN" };
         TemplateSlotLayout.Apply(block, fields, applied, 4, 4, 770);
         Assert.Contains(block.Fields, f => f.FieldValue.Name == "TIRIdDetails_TIRID");
+
+        TemplateLayoutStore.ClearTemplate(OrganizationFieldGroupTemplate.TemplateName);
+    }
+
+    [Fact]
+    public void TemplateLayoutStore_EmbeddedRemovedPict_StaysSuppressed()
+    {
+        TemplateLayoutStore.ClearTemplate(OrganizationFieldGroupTemplate.TemplateName);
+        var org = new OrganizationFieldGroupTemplate();
+        var slots = org.GetPreviewSlots([]).Select(s => s.Clone()).ToList();
+
+        // Simulate MergeTemplateAt: embed Address CountryCode data + removed Pict tombstone.
+        var data = new TemplateSlot
+        {
+            Id = TemplateSlot.MakeId(TemplateSlotKind.Data, AddressFieldGroupTemplate.TemplateName, "CountryCode", "embed:1"),
+            Suffix = "CountryCode",
+            Label = "CountryCode",
+            Kind = TemplateSlotKind.Data,
+            X = 40,
+            Y = 240,
+            Width = 40,
+            Height = Consts.DefaultHeightData,
+            Group = AddressFieldGroupTemplate.TemplateName,
+            StemHint = "embed:1",
+            IsEmbedded = true,
+        };
+        var pict = new TemplateSlot
+        {
+            Id = TemplateSlot.MakeId(TemplateSlotKind.Pict, AddressFieldGroupTemplate.TemplateName, "CountryCode", "embed:1"),
+            Suffix = "CountryCode",
+            Label = "CountryCode",
+            Kind = TemplateSlotKind.Pict,
+            X = 86,
+            Y = 242,
+            Width = LayoutUtil.PictSize,
+            Height = LayoutUtil.PictSize,
+            Group = AddressFieldGroupTemplate.TemplateName,
+            StemHint = "embed:1",
+            IsEmbedded = true,
+            IsRemoved = true,
+        };
+        slots.Add(data);
+        slots.Add(pict);
+        TemplateLayoutStore.SaveTemplate(OrganizationFieldGroupTemplate.TemplateName, slots, replaceBase: true);
+
+        var applied = org.GetPreviewSlots([]);
+        var gotPict = Assert.Single(
+            applied,
+            s => s.Kind == TemplateSlotKind.Pict && s.Suffix == "CountryCode" && s.StemHint == "embed:1"
+        );
+        Assert.True(gotPict.IsRemoved);
+
+        var fields = new List<Data>
+        {
+            Field("ConsignorDetails_OrganizationName", "C150 |", "MAIN"),
+            Field("ConsignorDetails_Address_CountryCode", "C2 |", "MAIN"),
+        };
+        var block = new Block { Name = "MAIN" };
+        TemplateSlotLayout.Apply(block, fields, applied, 4, 4, 770);
+        Assert.DoesNotContain(
+            block.Fields,
+            f =>
+                f.FieldType == Type.Pict
+                && f.FieldValue.Comment.Contains("CountryCode", StringComparison.OrdinalIgnoreCase)
+        );
 
         TemplateLayoutStore.ClearTemplate(OrganizationFieldGroupTemplate.TemplateName);
     }

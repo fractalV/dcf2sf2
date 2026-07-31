@@ -162,6 +162,79 @@ internal partial class TemplateLayoutPreviewWindow : Window
         _listDragStarted = false;
     }
 
+    private void TemplatesList_PreviewMouseRightButtonDown(object sender, MouseButtonEventArgs e)
+    {
+        var template = FindTemplateFromListHit(e.OriginalSource as DependencyObject);
+        if (template is null)
+            return;
+
+        TemplatesList.SelectedItem = template;
+    }
+
+    private void TemplatesList_ContextMenuOpening(object sender, ContextMenuEventArgs e)
+    {
+        if (DeleteTemplateMenuItem is null)
+            return;
+
+        bool canDelete =
+            SelectedTemplate is { } t
+            && FieldGroupTemplateRegistry.Default.IsUserTemplate(t.Name);
+        DeleteTemplateMenuItem.IsEnabled = canDelete;
+        DeleteTemplateMenuItem.ToolTip = canDelete
+            ? "Удалить пользовательский шаблон"
+            : "Встроенный шаблон удалить нельзя";
+    }
+
+    private void DeleteTemplate_Click(object sender, RoutedEventArgs e)
+    {
+        if (SelectedTemplate is not { } template)
+            return;
+
+        if (!FieldGroupTemplateRegistry.Default.IsUserTemplate(template.Name))
+        {
+            MessageBox.Show(
+                this,
+                "Встроенный шаблон удалить нельзя. Можно сбросить сохранённую раскладку кнопкой «Сбросить».",
+                "Удалить шаблон",
+                MessageBoxButton.OK,
+                MessageBoxImage.Information
+            );
+            return;
+        }
+
+        var confirm = MessageBox.Show(
+            this,
+            $"Удалить пользовательский шаблон «{template.Name}»?\nРаскладка и определение будут удалены без возможности восстановления.",
+            "Удалить шаблон",
+            MessageBoxButton.YesNo,
+            MessageBoxImage.Warning,
+            MessageBoxResult.No
+        );
+        if (confirm != MessageBoxResult.Yes)
+            return;
+
+        string name = template.Name;
+        if (!UserTemplateStore.Remove(name))
+        {
+            MessageBox.Show(
+                this,
+                $"Не удалось удалить шаблон «{name}».",
+                "Удалить шаблон",
+                MessageBoxButton.OK,
+                MessageBoxImage.Warning
+            );
+            return;
+        }
+
+        _working.Remove(name);
+        _selectedIds.Clear();
+        UiSettings.PersistStores();
+        RefreshTemplatesList();
+        _dirty = false;
+        Redraw();
+        StatusText.Text = $"Удалён шаблон «{name}»";
+    }
+
     protected override void OnPreviewMouseLeftButtonUp(MouseButtonEventArgs e)
     {
         if (_pendingListSelect is not null && !_listDragStarted)
@@ -236,12 +309,19 @@ internal partial class TemplateLayoutPreviewWindow : Window
             StringComparer.OrdinalIgnoreCase
         );
 
-        var sourceSlots = source.GetPreviewSlots(_ignoreFields).Select(s => s.Clone()).ToList();
-        if (sourceSlots.Count == 0)
+        // Same session cache as the editor canvas — GetPreviewSlots rematerializes from
+        // store+defaults and can miss edits still held (and shown) in _working.
+        // Keep removed Pict tombstones (so EnsurePictSlots won't revive them); skip other removed.
+        var sourceSlots = GetWorkingSlots(source)
+            .Where(s => !s.IsRemoved || s.Kind == TemplateSlotKind.Pict)
+            .Select(s => s.Clone())
+            .ToList();
+        var visible = sourceSlots.Where(s => !s.IsRemoved).ToList();
+        if (visible.Count == 0)
             return;
 
-        int minX = sourceSlots.Min(s => s.X);
-        int minY = sourceSlots.Min(s => s.Y);
+        int minX = visible.Min(s => s.X);
+        int minY = visible.Min(s => s.Y);
         int dropX = Snap(Math.Max(0, (int)Math.Round(dropPos.X / Scale)));
         int dropY = Snap(Math.Max(0, (int)Math.Round(dropPos.Y / Scale)));
         int offsetX = dropX - minX;
@@ -255,7 +335,7 @@ internal partial class TemplateLayoutPreviewWindow : Window
             slot.X = Math.Max(0, Snap(slot.X + offsetX));
             slot.Y = Math.Max(0, Snap(slot.Y + offsetY));
             slot.IsEmbedded = true;
-            slot.IsRemoved = false;
+            // Do not clear IsRemoved on Pict tombstones — that would revive them on the target.
 
             if (string.IsNullOrEmpty(slot.Id))
                 slot.Id = TemplateSlot.MakeId(slot.Kind, slot.Group, slot.Suffix, slot.StemHint);
@@ -265,7 +345,8 @@ internal partial class TemplateLayoutPreviewWindow : Window
 
             existingIds.Add(slot.Id);
             target.Add(slot);
-            _selectedIds.Add(slot.Id);
+            if (!slot.IsRemoved)
+                _selectedIds.Add(slot.Id);
         }
 
         _dirty = true;
@@ -362,6 +443,7 @@ internal partial class TemplateLayoutPreviewWindow : Window
         ZoomResetButton.Visibility = _textMode ? Visibility.Collapsed : Visibility.Visible;
         DeleteButton.IsEnabled = !_textMode;
         RestoreButton.IsEnabled = !_textMode;
+        AddTextButton.IsEnabled = !_textMode;
     }
 
     private void ZoomOut_Click(object sender, RoutedEventArgs e) => SetZoom(_scale / ZoomStep);
@@ -445,6 +527,18 @@ internal partial class TemplateLayoutPreviewWindow : Window
         return true;
     }
 
+    private static readonly Brush RowGuideStroke = new SolidColorBrush(Color.FromArgb(110, 180, 80, 40));
+    private static readonly Brush RowBandFill = new SolidColorBrush(Color.FromArgb(28, 180, 120, 40));
+    private static readonly Brush RowLabelBrush = new SolidColorBrush(Color.FromArgb(200, 140, 60, 20));
+
+    private bool ShowRowGuides => ShowRowGuidesCheck?.IsChecked == true;
+
+    private void ShowRowGuides_Changed(object sender, RoutedEventArgs e)
+    {
+        if (IsLoaded)
+            Redraw();
+    }
+
     private void Redraw()
     {
         if (_textMode)
@@ -472,15 +566,85 @@ internal partial class TemplateLayoutPreviewWindow : Window
         PreviewCanvas.Width = Math.Max(800, maxX);
         PreviewCanvas.Height = Math.Max(400, maxY);
 
+        if (ShowRowGuides)
+            DrawRowGuides(slots);
+
         foreach (var slot in slots.OrderBy(s => s.Kind switch
                  {
                      TemplateSlotKind.Text => 0,
                      TemplateSlotKind.Pict => 2,
                      _ => 1,
                  }))
+        {
+            // Dismissed IGNORED (deleted in text) stay out of the canvas until restored.
+            if (slot.IsIgnored && slot.IsRemoved)
+                continue;
+            // Pict tombstones stay in the model (block EnsurePictSlots) but are not drawn.
+            if (slot.Kind == TemplateSlotKind.Pict && slot.IsRemoved)
+                continue;
             AddSlotVisual(slot);
+        }
 
         UpdateStatus(template, slots.Count);
+    }
+
+    /// <summary>
+    /// Draws a tinted band + baseline for each distinct Data Y so close rows (Y=4 vs Y=24) stay obvious.
+    /// </summary>
+    private void DrawRowGuides(IReadOnlyList<TemplateSlot> slots)
+    {
+        var dataRows = slots
+            .Where(s => s.Kind == TemplateSlotKind.Data && !s.IsExcluded)
+            .GroupBy(s => s.Y)
+            .OrderBy(g => g.Key)
+            .ToList();
+        if (dataRows.Count == 0)
+            return;
+
+        double canvasW = PreviewCanvas.Width;
+        int rowIndex = 1;
+        foreach (var row in dataRows)
+        {
+            int y = row.Key;
+            int h = Math.Max(Consts.DefaultHeightData, row.Max(s => s.Height));
+            var band = new Rectangle
+            {
+                Width = canvasW,
+                Height = Math.Max(8, h * Scale),
+                Fill = RowBandFill,
+                IsHitTestVisible = false,
+            };
+            Canvas.SetLeft(band, 0);
+            Canvas.SetTop(band, y * Scale);
+            PreviewCanvas.Children.Add(band);
+
+            var line = new Line
+            {
+                X1 = 0,
+                Y1 = y * Scale,
+                X2 = canvasW,
+                Y2 = y * Scale,
+                Stroke = RowGuideStroke,
+                StrokeThickness = 1,
+                StrokeDashArray = new DoubleCollection([4, 3]),
+                IsHitTestVisible = false,
+            };
+            PreviewCanvas.Children.Add(line);
+
+            var tag = new TextBlock
+            {
+                Text = $"строка {rowIndex} · Y={y}",
+                FontSize = 10,
+                Foreground = RowLabelBrush,
+                Background = new SolidColorBrush(Color.FromArgb(210, 255, 248, 240)),
+                Padding = new Thickness(3, 0, 3, 0),
+                IsHitTestVisible = false,
+            };
+            Canvas.SetLeft(tag, 2);
+            Canvas.SetTop(tag, Math.Max(0, y * Scale - 12));
+            PreviewCanvas.Children.Add(tag);
+            rowIndex++;
+        }
     }
 
     private void UpdateStatus(IFieldGroupTemplate template, int count)
@@ -489,14 +653,32 @@ internal partial class TemplateLayoutPreviewWindow : Window
         int removed = slots.Count(s => s.IsRemoved);
         string sel = _selectedIds.Count > 0 ? $" · выбрано {_selectedIds.Count}" : "";
         string rem = removed > 0 ? $" · удалено {removed}" : "";
+
+        var dataYs = slots
+            .Where(s => s.Kind == TemplateSlotKind.Data && !s.IsExcluded)
+            .Select(s => s.Y)
+            .Distinct()
+            .OrderBy(y => y)
+            .ToList();
+        string rows =
+            dataYs.Count > 1
+                ? $" · ⚠ Data на {dataYs.Count} строках (Y={string.Join(", ", dataYs)})"
+                : dataYs.Count == 1
+                    ? $" · 1 строка Data (Y={dataYs[0]})"
+                    : "";
+
         StatusText.Text = _dirty
-            ? $"Правки не сохранены · {template.Name} · {count} слотов{rem}{sel}"
-            : $"{template.Name} · {count} слотов{rem}{sel}"
+            ? $"Правки не сохранены · {template.Name} · {count} слотов{rem}{sel}{rows}"
+            : $"{template.Name} · {count} слотов{rem}{sel}{rows}"
               + (TemplateLayoutStore.IsReplaceBase(template.Name)
                   ? " · база заменена"
                   : TemplateLayoutStore.HasOverrides(template.Name)
                       ? " · есть сохранённая раскладка"
                       : "");
+        StatusText.Foreground =
+            dataYs.Count > 1
+                ? new SolidColorBrush(Color.FromRgb(160, 80, 20))
+                : Brushes.Gray;
     }
 
     private bool IsSelected(TemplateSlot slot) =>
@@ -597,11 +779,31 @@ internal partial class TemplateLayoutPreviewWindow : Window
 
             border.MouseLeftButtonDown += Slot_MouseLeftButtonDown;
             grip.MouseLeftButtonDown += Grip_MouseLeftButtonDown;
+            if (slot.Kind == TemplateSlotKind.Text)
+                border.ToolTip = SlotToolTip(slot) + "\nДвойной клик — изменить подпись";
         }
 
         Canvas.SetLeft(border, slot.X * Scale);
         Canvas.SetTop(border, slot.Y * Scale);
         PreviewCanvas.Children.Add(border);
+
+        // Corner Y badge on Data — makes near-duplicate rows obvious without reading the status bar.
+        if (slot.Kind == TemplateSlotKind.Data && !excluded && ShowRowGuides)
+        {
+            var yBadge = new TextBlock
+            {
+                Text = $"Y{slot.Y}",
+                FontSize = 9,
+                FontWeight = FontWeights.SemiBold,
+                Foreground = RowLabelBrush,
+                Background = new SolidColorBrush(Color.FromArgb(220, 255, 250, 240)),
+                Padding = new Thickness(2, 0, 2, 0),
+                IsHitTestVisible = false,
+            };
+            Canvas.SetLeft(yBadge, slot.X * Scale);
+            Canvas.SetTop(yBadge, Math.Max(0, slot.Y * Scale - 11));
+            PreviewCanvas.Children.Add(yBadge);
+        }
 
         if (excluded)
         {
@@ -720,7 +922,11 @@ internal partial class TemplateLayoutPreviewWindow : Window
         if (_mode == InteractionMode.Marquee)
             FinishMarquee(e.GetPosition(PreviewCanvas));
         else if (_mode is InteractionMode.DragGroup or InteractionMode.Resize)
+        {
             FinishMoveOrResize();
+            // Refresh text preview if visible; keep canvas badges/guides in sync with slot.X/Y.
+            Redraw();
+        }
 
         if (PreviewCanvas.IsMouseCaptured)
             PreviewCanvas.ReleaseMouseCapture();
@@ -798,13 +1004,14 @@ internal partial class TemplateLayoutPreviewWindow : Window
         slot.Kind switch
         {
             TemplateSlotKind.Text =>
-                $"Text: {slot.Label}\n{slot.X},{slot.Y} {slot.Width}×{slot.Height}"
+                $"Text: {slot.Label}\nX={slot.X}  Y={slot.Y}  {slot.Width}×{slot.Height}"
                     + (slot.IsRemoved ? "\n(удалено из шаблона)" : ""),
             TemplateSlotKind.Pict =>
-                $"Pict: {slot.Label}\n{slot.X},{slot.Y} {slot.Width}×{slot.Height}"
+                $"Pict: {slot.Label}\nX={slot.X}  Y={slot.Y}  {slot.Width}×{slot.Height}"
                     + (slot.IsRemoved ? "\n(удалено из шаблона)" : ""),
             _ =>
-                $"{slot.Suffix}\n{slot.X},{slot.Y} {slot.Width}×{slot.Height}"
+                $"{slot.Suffix}\nX={slot.X}  Y={slot.Y}  {slot.Width}×{slot.Height}"
+                    + $"\nСтрока по Y={slot.Y} (в SF2 поля с разным Y — разные ряды)"
                     + (slot.IsRemoved ? "\n(удалено из шаблона)" : "")
                     + (slot.IsIgnored ? "\n(игнор. поле)" : ""),
         };
@@ -873,6 +1080,13 @@ internal partial class TemplateLayoutPreviewWindow : Window
             return;
         if (sender is not Border { Tag: TemplateSlot slot } || slot.IsIgnored)
             return;
+
+        if (e.ClickCount == 2 && slot.Kind == TemplateSlotKind.Text && !slot.IsRemoved)
+        {
+            TextSlot_EditLabel(slot);
+            e.Handled = true;
+            return;
+        }
 
         PreviewCanvas.Focus();
         bool ctrl = Keyboard.Modifiers.HasFlag(ModifierKeys.Control);
@@ -969,6 +1183,140 @@ internal partial class TemplateLayoutPreviewWindow : Window
     private void Delete_Click(object sender, RoutedEventArgs e) => DeleteSelectedSlots();
 
     private void Restore_Click(object sender, RoutedEventArgs e) => RestoreSelectedSlots();
+
+    private void AddText_Click(object sender, RoutedEventArgs e)
+    {
+        if (SelectedTemplate is not { } template)
+            return;
+
+        if (!TryPromptTextLabel("Текст", out string label))
+            return;
+
+        var slots = GetWorkingSlots(template);
+        int x = TemplateSlotLayout.OriginX;
+        int y = TemplateSlotLayout.OriginY;
+        var visible = slots.Where(s => !s.IsExcluded).ToList();
+        if (visible.Count > 0)
+            y = Snap(visible.Max(s => s.Y + s.Height) + 4);
+
+        int width = Math.Max(40, SnapAtLeast(label.Length * Consts.DefaultWidthChar, 40));
+        string key = TemplatePreviewText.NextUserTextKey(slots);
+        var slot = TemplateSlotLayout.TextSlot(
+            template.Name,
+            label,
+            x,
+            y,
+            width,
+            Consts.DefaultHeightText,
+            key
+        );
+        slot.IsEmbedded = true;
+        slots.Add(slot);
+
+        _selectedIds.Clear();
+        _selectedIds.Add(slot.Id);
+        _dirty = true;
+        Redraw();
+        StatusText.Text = $"Добавлен текст «{label}»";
+    }
+
+    private bool TryPromptTextLabel(string initial, out string label)
+    {
+        label = initial;
+        var dlg = new Window
+        {
+            Title = "Текстовое поле",
+            Owner = this,
+            WindowStartupLocation = WindowStartupLocation.CenterOwner,
+            ResizeMode = ResizeMode.NoResize,
+            SizeToContent = SizeToContent.WidthAndHeight,
+            ShowInTaskbar = false,
+        };
+        var panel = new StackPanel { Margin = new Thickness(12), Width = 360 };
+        panel.Children.Add(
+            new TextBlock
+            {
+                Text = "Подпись текстового поля:",
+                Margin = new Thickness(0, 0, 0, 8),
+                TextWrapping = TextWrapping.Wrap,
+            }
+        );
+        var box = new TextBox
+        {
+            Text = initial,
+            Margin = new Thickness(0, 0, 0, 12),
+            MinWidth = 320,
+        };
+        panel.Children.Add(box);
+        var buttons = new StackPanel
+        {
+            Orientation = Orientation.Horizontal,
+            HorizontalAlignment = HorizontalAlignment.Right,
+        };
+        var ok = new Button
+        {
+            Content = "OK",
+            IsDefault = true,
+            Width = 88,
+            Margin = new Thickness(0, 0, 8, 0),
+            Padding = new Thickness(12, 4, 12, 4),
+        };
+        var cancel = new Button
+        {
+            Content = "Отмена",
+            IsCancel = true,
+            Width = 88,
+            Padding = new Thickness(12, 4, 12, 4),
+        };
+        bool accepted = false;
+        ok.Click += (_, _) =>
+        {
+            if (string.IsNullOrWhiteSpace(box.Text))
+            {
+                MessageBox.Show(
+                    dlg,
+                    "Введите текст подписи.",
+                    "Текстовое поле",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Information
+                );
+                return;
+            }
+
+            accepted = true;
+            dlg.DialogResult = true;
+        };
+        cancel.Click += (_, _) => dlg.DialogResult = false;
+        buttons.Children.Add(ok);
+        buttons.Children.Add(cancel);
+        panel.Children.Add(buttons);
+        dlg.Content = panel;
+        box.SelectAll();
+        box.Focus();
+        if (dlg.ShowDialog() != true || !accepted)
+            return false;
+
+        label = box.Text.Trim();
+        return true;
+    }
+
+    private void TextSlot_EditLabel(TemplateSlot slot)
+    {
+        if (slot.Kind != TemplateSlotKind.Text || slot.IsIgnored || slot.IsRemoved)
+            return;
+
+        string current = string.IsNullOrEmpty(slot.Label) ? slot.Suffix : slot.Label;
+        if (!TryPromptTextLabel(current, out string label))
+            return;
+
+        slot.Label = label;
+        int minW = Math.Max(40, SnapAtLeast(label.Length * Consts.DefaultWidthChar, 40));
+        if (slot.Width < minW)
+            slot.Width = minW;
+        _dirty = true;
+        Redraw();
+        StatusText.Text = $"Текст изменён: «{label}»";
+    }
 
     private void DeleteSelectedSlots()
     {
@@ -1068,7 +1416,8 @@ internal partial class TemplateLayoutPreviewWindow : Window
             foreach (var name in _working.Keys.ToList())
             {
                 var list = _working[name];
-                list.RemoveAll(s => s.IsRemoved);
+                // Keep removed Picts as tombstones (same as TemplateLayoutStore.SaveTemplate).
+                list.RemoveAll(s => s.IsRemoved && s.Kind != TemplateSlotKind.Pict);
             }
         }
 

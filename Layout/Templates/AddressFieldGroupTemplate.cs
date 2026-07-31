@@ -78,10 +78,25 @@ internal sealed class AddressFieldGroupTemplate : IFieldGroupTemplate
         if (TemplateLayoutStore.HasOverrides(TemplateName))
         {
             var slots = new AddressFieldGroupTemplate().GetPreviewSlots(ignoreFields);
-            return TemplateSlotLayout.Apply(block, fields, slots, baseX, y, maxWidth);
+            var addressOnly = fields
+                .Where(f => !IdentityCardFieldGroupTemplate.IsIdentityCardField(f.FieldElement.ElementName))
+                .ToList();
+            return TemplateSlotLayout.Apply(
+                block,
+                addressOnly,
+                slots,
+                baseX,
+                y,
+                maxWidth,
+                suppressFieldComments: false
+            );
         }
 
-        Data? Find(string suffix) => LayoutUtil.FindBySuffix(fields, suffix);
+        Data? Find(string suffix) =>
+            fields.FirstOrDefault(f =>
+                LayoutUtil.GetLastToken(f.FieldElement.ElementName).Equals(suffix, StringComparison.OrdinalIgnoreCase)
+                && !IdentityCardFieldGroupTemplate.IsIdentityCardField(f.FieldElement.ElementName)
+            );
 
         y = LayoutUtil.PlaceCompactRow(
             block,
@@ -167,6 +182,7 @@ internal sealed class AddressFieldGroupTemplate : IFieldGroupTemplate
                     Id = TemplateSlot.MakeId(TemplateSlotKind.Data, group, suffix, stemHint),
                     Suffix = suffix,
                     Label = suffix,
+                    Comment = LayoutUtil.DefaultFieldComment(suffix, group),
                     Kind = TemplateSlotKind.Data,
                     X = x,
                     Y = y,
@@ -181,7 +197,7 @@ internal sealed class AddressFieldGroupTemplate : IFieldGroupTemplate
                     continue;
 
                 any = true;
-                x += width + 4;
+                x += LayoutUtil.AdvanceAfterData(width, suffix);
             }
 
             if (any)

@@ -25,11 +25,6 @@ internal static class Sf2LayoutBuilder
         "KPP",
         "OKPOID",
         "OKATOCode",
-        "Phone",
-        "Fax",
-        "Telex",
-        "E_mail",
-        "mail",
     ];
 
     private static readonly HashSet<string> OrgStructuralSet =
@@ -379,32 +374,131 @@ internal static class Sf2LayoutBuilder
         ConversionOptions options
     )
     {
-        const int pad = 8;
-        int contentY = startY + pad;
-        bool isOrg = fields.Any(f => GetOrgStem(f.FieldElement.ElementName) is not null);
+        bool isContact = ContactFieldGroupTemplate.IsContactOnlyCluster(fields);
+        bool isOrg =
+            !isContact
+            && fields.Any(f => GetOrgStem(f.FieldElement.ElementName) is not null);
+        int contentWidth = Consts.DefaultWidthBlock - 16;
+        int contentX = Consts.Default_X + 4;
 
-        int endY = isOrg
-            ? Templates.Organization.LayoutOrgFields(
+        // Probe without comments: one data row → title Text only, no Rect.
+        // (Comments can become Text labels in some layouts and skew the single-row check.)
+        var probe = new Block { Name = "_probe" };
+        LayoutSectionContent(
+            probe,
+            fields,
+            isOrg,
+            isContact,
+            contentX,
+            0,
+            contentWidth,
+            options,
+            suppressFieldComments: true
+        );
+        bool singleLine = !isOrg && IsSingleDataRow(probe);
+
+        if (singleLine)
+        {
+            int y = startY;
+            if (!string.IsNullOrWhiteSpace(sectionTitle))
+            {
+                int tw = Math.Min(
+                    Math.Max(sectionTitle.Length * Consts.DefaultWidthChar, 40),
+                    Consts.DefaultWidthBlock - 8
+                );
+                block.Fields.Add(TextField(Consts.Default_X, y, tw, Consts.DefaultHeightText, sectionTitle.Trim()));
+                y += Consts.DefaultHeightText + 4;
+            }
+
+            return LayoutSectionContent(
                 block,
                 fields,
-                Consts.Default_X + 4,
-                contentY,
-                Consts.DefaultWidthBlock - 16,
-                options.IgnoreFields
-            )
-            : LayoutGenericFields(
-                block,
-                fields,
-                Consts.Default_X + 4,
-                contentY,
-                Consts.DefaultWidthBlock - 16,
+                isOrg,
+                isContact,
+                contentX,
+                y,
+                contentWidth,
                 options,
-                Consts.DefaultBlockName
+                suppressFieldComments: false
             );
+        }
 
-        int height = Math.Max(endY - startY + pad, Consts.DefaultHeightData + pad * 2);
+        int topPad = RectCaptionTopPad(sectionTitle, Consts.DefaultWidthBlock - 8);
+        const int bottomPad = 8;
+        int endY = LayoutSectionContent(
+            block,
+            fields,
+            isOrg,
+            isContact,
+            contentX,
+            startY + topPad,
+            contentWidth,
+            options,
+            suppressFieldComments: false
+        );
+        int height = Math.Max(endY - startY + bottomPad, Consts.DefaultHeightData + topPad + bottomPad);
         AddSectionRect(block, Consts.Default_X, startY, Consts.DefaultWidthBlock - 8, height, sectionTitle);
         return startY + height;
+    }
+
+    private static bool IsSingleDataRow(Block probe)
+    {
+        var dataYs = probe
+            .Fields.Where(f => f.FieldType == Type.Data)
+            .Select(f => f.FieldPosition.Y)
+            .Distinct()
+            .ToList();
+        return dataYs.Count <= 1;
+    }
+
+    private static int LayoutSectionContent(
+        Block block,
+        List<Data> fields,
+        bool isOrg,
+        bool isContact,
+        int baseX,
+        int startY,
+        int maxWidth,
+        ConversionOptions options,
+        bool suppressFieldComments
+    )
+    {
+        if (isContact)
+        {
+            return ContactFieldGroupTemplate.LayoutContactFields(
+                block,
+                fields,
+                baseX,
+                startY,
+                maxWidth,
+                options.IgnoreFields,
+                suppressFieldComments
+            );
+        }
+
+        if (isOrg)
+        {
+            return Templates.Organization.LayoutOrgFields(
+                block,
+                fields,
+                baseX,
+                startY,
+                maxWidth,
+                options.IgnoreFields,
+                suppressFieldComments
+            );
+        }
+
+        return LayoutGenericFields(
+            block,
+            fields,
+            baseX,
+            startY,
+            maxWidth,
+            options,
+            Consts.DefaultBlockName,
+            suppressFieldComments
+        );
     }
 
     private static void AddSectionRect(Block block, int x, int y, int w, int h, string title)
@@ -478,8 +572,12 @@ internal static class Sf2LayoutBuilder
         Dictionary<string, string> sectionTitles
     )
     {
-        const int pad = 8;
-        int contentY = startY + pad;
+        string leftTitle = ResolveSectionTitle(leftName, sectionTitles);
+        string rightTitle = ResolveSectionTitle(rightName, sectionTitles);
+        int rectW = Consts.ColumnWidth + 4;
+        int topPad = Math.Max(RectCaptionTopPad(leftTitle, rectW), RectCaptionTopPad(rightTitle, rectW));
+        const int bottomPad = 8;
+        int contentY = startY + topPad;
         int colW = Consts.ColumnWidth - 4;
 
         int yLeft = leftFields.Count == 0
@@ -490,7 +588,8 @@ internal static class Sf2LayoutBuilder
                 Consts.Default_X + 4,
                 contentY,
                 colW,
-                options.IgnoreFields
+                options.IgnoreFields,
+                suppressFieldComments: false
             );
         int yRight = rightFields.Count == 0
             ? contentY
@@ -500,38 +599,38 @@ internal static class Sf2LayoutBuilder
                 Consts.RightColumnX + 4,
                 contentY,
                 colW,
-                options.IgnoreFields
+                options.IgnoreFields,
+                suppressFieldComments: false
             );
 
         int endY = Math.Max(yLeft, yRight);
-        int height = Math.Max(endY - startY + pad, Consts.DefaultHeightData + pad * 2);
-        int rectW = Consts.ColumnWidth + 4;
+        int height = Math.Max(endY - startY + bottomPad, Consts.DefaultHeightData + topPad + bottomPad);
 
         if (leftFields.Count > 0)
-        {
-            AddSectionRect(
-                block,
-                Consts.Default_X,
-                startY,
-                rectW,
-                height,
-                ResolveSectionTitle(leftName, sectionTitles)
-            );
-        }
+            AddSectionRect(block, Consts.Default_X, startY, rectW, height, leftTitle);
 
         if (rightFields.Count > 0)
-        {
-            AddSectionRect(
-                block,
-                Consts.RightColumnX,
-                startY,
-                rectW,
-                height,
-                ResolveSectionTitle(rightName, sectionTitles)
-            );
-        }
+            AddSectionRect(block, Consts.RightColumnX, startY, rectW, height, rightTitle);
 
         return startY + height;
+    }
+
+    /// <summary>
+    /// Space under the Rect top edge so fields do not cover the frame caption.
+    /// Long titles wrap; estimate line count from caption width.
+    /// </summary>
+    private static int RectCaptionTopPad(string title, int rectWidth)
+    {
+        // Extra air under the Rect top/caption so first Data row is not tight to the frame.
+        const int extraBelowCaption = 16;
+        string t = (title ?? string.Empty).Trim();
+        if (t.Length == 0)
+            return Consts.DefaultHeightText + extraBelowCaption;
+
+        int usable = Math.Max(rectWidth - 16, Consts.DefaultWidthChar * 10);
+        int charsPerLine = Math.Max(usable / Consts.DefaultWidthChar, 1);
+        int lines = Math.Max(1, (t.Length + charsPerLine - 1) / charsPerLine);
+        return lines * Consts.DefaultHeightText + extraBelowCaption;
     }
 
     private static int LayoutGenericFields(
@@ -541,7 +640,8 @@ internal static class Sf2LayoutBuilder
         int startY,
         int maxWidth,
         ConversionOptions options,
-        string? blockPath = null
+        string? blockPath = null,
+        bool suppressFieldComments = false
     )
     {
         int y = startY;
@@ -571,7 +671,8 @@ internal static class Sf2LayoutBuilder
             foreach (var f in loading)
             {
                 int w = WidthFor(f, 120);
-                block.Fields.Add(DataField(f, lx, rowY, w, Consts.DefaultHeightData, ExtractComment(f.FieldElement.ElementValue)));
+                string? label = suppressFieldComments ? null : ExtractComment(f.FieldElement.ElementValue);
+                block.Fields.Add(DataField(f, lx, rowY, w, Consts.DefaultHeightData, label));
                 lx += w + 8;
             }
 
@@ -579,7 +680,8 @@ internal static class Sf2LayoutBuilder
             foreach (var f in unloading)
             {
                 int w = WidthFor(f, 120);
-                block.Fields.Add(DataField(f, rx, rowY, w, Consts.DefaultHeightData, ExtractComment(f.FieldElement.ElementValue)));
+                string? label = suppressFieldComments ? null : ExtractComment(f.FieldElement.ElementValue);
+                block.Fields.Add(DataField(f, rx, rowY, w, Consts.DefaultHeightData, label));
                 rx += w + 8;
             }
 
@@ -587,7 +689,7 @@ internal static class Sf2LayoutBuilder
         }
 
         // Document triad PrDocumentName/Number/Date
-        y = LayoutDocumentTriad(block, remaining, baseX, y, maxWidth, out var usedDoc);
+        y = LayoutDocumentTriad(block, remaining, baseX, y, maxWidth, out var usedDoc, suppressFieldComments);
         remaining = remaining.Where(f => !usedDoc.Contains(f.FieldElement.ElementName)).ToList();
 
         // Signature person row
@@ -602,42 +704,14 @@ internal static class Sf2LayoutBuilder
             maxWidth,
             options.IgnoreFields,
             blockPath,
-            StackFields
+            (b, fs, bx, yy, mw) => LayoutUtil.LayoutFlowRow(b, fs, bx, yy, mw, includeFieldComments: !suppressFieldComments)
         );
 
         return y;
     }
 
-    private static int StackFields(Block block, List<Data> fields, int baseX, int y, int maxWidth)
-    {
-        foreach (var f in fields)
-        {
-            bool seq = f.FieldElement.ElementValue.Contains("SEQ=", StringComparison.OrdinalIgnoreCase);
-            int h = HeightFor(f);
-            int w = Math.Min(WidthFor(f, maxWidth), maxWidth);
-            string comment = ExtractComment(f.FieldElement.ElementValue);
-
-            if (!string.IsNullOrEmpty(comment) && comment.Length < 60)
-            {
-                block.Fields.Add(
-                    TextField(baseX, y, Math.Min(comment.Length * Consts.DefaultWidthChar, maxWidth), Consts.DefaultHeightText, comment)
-                );
-                y += Consts.DefaultHeightText + 2;
-                block.Fields.Add(DataField(f, baseX, y, w, h));
-            }
-            else
-            {
-                block.Fields.Add(
-                    DataField(f, baseX, y, w, h, comment.Length > 0 && comment.Length < 80 ? comment : null)
-                );
-            }
-
-            MaybeAddPict(block, f, baseX, y, w);
-            y += h + (seq ? 4 : 8);
-        }
-
-        return y;
-    }
+    private static int StackFields(Block block, List<Data> fields, int baseX, int y, int maxWidth) =>
+        LayoutUtil.LayoutFlowRow(block, fields, baseX, y, maxWidth);
 
     private static int LayoutDocumentTriad(
         Block block,
@@ -645,7 +719,8 @@ internal static class Sf2LayoutBuilder
         int baseX,
         int y,
         int maxWidth,
-        out HashSet<string> used
+        out HashSet<string> used,
+        bool suppressFieldComments = false
     )
     {
         used = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -665,7 +740,8 @@ internal static class Sf2LayoutBuilder
         if (name is not null)
         {
             int w = Math.Min(334, maxWidth / 2);
-            block.Fields.Add(DataField(name, x, y, w, Consts.DefaultHeightData, ExtractComment(name.FieldElement.ElementValue)));
+            string? label = suppressFieldComments ? null : ExtractComment(name.FieldElement.ElementValue);
+            block.Fields.Add(DataField(name, x, y, w, Consts.DefaultHeightData, label));
             used.Add(name.FieldElement.ElementName);
             x += w + 4;
         }

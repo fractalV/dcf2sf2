@@ -12,6 +12,13 @@
     <DockPanel Margin="12">
         <DockPanel DockPanel.Dock="Top" Margin="0,0,0,8">
             <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+                <Button x:Name="AddTextButton"
+                        Content="Текст…"
+                        Width="88"
+                        Padding="12,4"
+                        Margin="0,0,8,0"
+                        ToolTip="Добавить текстовое поле на холст"
+                        Click="AddText_Click" />
                 <Button x:Name="DeleteButton"
                         Content="Удалить"
                         Width="88"
@@ -46,7 +53,7 @@
             </StackPanel>
             <TextBlock VerticalAlignment="Center"
                        TextWrapping="Wrap"
-                       Text="Рамка — выделить; Ctrl+клик — добавить; перетаскивание (сетка 4); край — ширина; Delete — удалить поле; Esc — снять выделение. Перетащите шаблон из списка на холст, чтобы добавить его поля." />
+                       Text="Рамка — выделить; Ctrl+клик — добавить; перетаскивание (сетка 4); край — ширина; Delete — удалить; «Текст…» — подпись; Esc — снять выделение. Перетащите шаблон из списка на холст." />
         </DockPanel>
 
         <TextBlock x:Name="StatusText"
@@ -66,7 +73,17 @@
                          DisplayMemberPath="Name"
                          SelectionChanged="TemplatesList_SelectionChanged"
                          PreviewMouseLeftButtonDown="TemplatesList_PreviewMouseLeftButtonDown"
-                         PreviewMouseMove="TemplatesList_PreviewMouseMove" />
+                         PreviewMouseMove="TemplatesList_PreviewMouseMove"
+                         PreviewMouseRightButtonDown="TemplatesList_PreviewMouseRightButtonDown"
+                         ContextMenuOpening="TemplatesList_ContextMenuOpening">
+                    <ListBox.ContextMenu>
+                        <ContextMenu>
+                            <MenuItem x:Name="DeleteTemplateMenuItem"
+                                      Header="Удалить"
+                                      Click="DeleteTemplate_Click" />
+                        </ContextMenu>
+                    </ListBox.ContextMenu>
+                </ListBox>
             </GroupBox>
 
             <GroupBox Grid.Column="2" Header="Расположение полей" Padding="4">
@@ -94,6 +111,14 @@
                                     Margin="0,0,12,0"
                                     ToolTip="Увеличить (Ctrl+колёсико)"
                                     Click="ZoomIn_Click" />
+                            <CheckBox x:Name="ShowRowGuidesCheck"
+                                      Content="Строки"
+                                      IsChecked="True"
+                                      Margin="0,0,12,0"
+                                      VerticalAlignment="Center"
+                                      ToolTip="Показывать линии Y у Data-полей — разные строки не сливаются визуально"
+                                      Checked="ShowRowGuides_Changed"
+                                      Unchecked="ShowRowGuides_Changed" />
                             <Button x:Name="ApplyTextButton"
                                     Content="Применить"
                                     Width="88"
@@ -115,7 +140,7 @@
                         </StackPanel>
                         <TextBlock VerticalAlignment="Center"
                                    Foreground="Gray"
-                                   Text="Холст — правка мышкой; Текст — SF2 (Data/Text/Pict; REMOVED — удалённые). Pict можно двигать и удалять." />
+                                   Text="Холст — правка мышкой; Текст — SF2 (Data/Text/Pict; REMOVED — удалённые; IGNORED — из списка игнора). Pict можно двигать и удалять." />
                     </DockPanel>
 
                     <ScrollViewer x:Name="CanvasHost"

@@ -13,7 +13,7 @@
         ResizeMode="CanResizeWithGrip">
     <DockPanel Margin="12">
         <StackPanel DockPanel.Dock="Top" Margin="0,0,0,8">
-            <TextBlock Text="Отметьте поля, которые нужно пропустить при конвертации. Группы — блоки DCF."
+            <TextBlock Text="Отметьте поля, которые нужно пропустить при конвертации. Дерево: пути блоков (\) и секции B/NAMESPACE."
                        TextWrapping="Wrap"
                        Margin="0,0,0,8" />
             <DockPanel Margin="0,0,0,4">
@@ -85,7 +85,7 @@
             </TreeView.ItemContainerStyle>
             <TreeView.Resources>
                 <HierarchicalDataTemplate DataType="{x:Type local:IgnoreBlockNode}"
-                                          ItemsSource="{Binding Fields}">
+                                          ItemsSource="{Binding Children}">
                     <CheckBox Content="{Binding Header}"
                               IsChecked="{Binding IsChecked, Mode=TwoWay}"
                               IsThreeState="True"

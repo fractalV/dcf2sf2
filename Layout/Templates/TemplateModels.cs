@@ -12,6 +12,8 @@ internal sealed class TemplateSlot
     public string Id { get; set; } = string.Empty;
     public required string Suffix { get; set; }
     public string Label { get; set; } = string.Empty;
+    /// <summary>SF2 Data comment after '`' (persisted with template layout).</summary>
+    public string Comment { get; set; } = string.Empty;
     public TemplateSlotKind Kind { get; set; } = TemplateSlotKind.Data;
     public int X { get; set; }
     public int Y { get; set; }
@@ -42,6 +44,7 @@ internal sealed class TemplateSlot
             Id = Id,
             Suffix = Suffix,
             Label = Label,
+            Comment = Comment,
             Kind = Kind,
             X = X,
             Y = Y,

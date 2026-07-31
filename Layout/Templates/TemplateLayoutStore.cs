@@ -15,6 +15,8 @@ internal sealed class TemplateSlotOverrideDto
 
     public string? Suffix { get; set; }
     public string? Label { get; set; }
+    /// <summary>SF2 Data comment after '`'.</summary>
+    public string? Comment { get; set; }
     public TemplateSlotKind Kind { get; set; }
     public string? Group { get; set; }
     public string? StemHint { get; set; }
@@ -97,6 +99,7 @@ internal static class TemplateLayoutStore
             Embedded = s.Embedded,
             Suffix = s.Suffix,
             Label = s.Label,
+            Comment = s.Comment,
             Kind = s.Kind,
             Group = s.Group,
             StemHint = s.StemHint,
@@ -134,8 +137,9 @@ internal static class TemplateLayoutStore
     }
 
     /// <param name="replaceBase">
-    /// When true, removed slots are dropped and the remaining layout becomes the new base
-    /// (full metadata). When false and the template is not already a replaced base, saves as overrides.
+    /// When true, removed non-Pict slots are dropped and the remaining layout becomes the new base
+    /// (full metadata). Removed Pict slots are kept as tombstones so EnsurePictSlots / layout Apply
+    /// do not recreate them. When false and the template is not already a replaced base, saves as overrides.
     /// </param>
     public static void SaveTemplate(
         string templateName,
@@ -148,8 +152,9 @@ internal static class TemplateLayoutStore
         lock (Gate)
             asBase = replaceBase || _replaceBase.Contains(templateName);
 
+        // Pict tombstones must survive replace-base: otherwise EnsurePictSlots recreates them.
         if (replaceBase)
-            slotList = slotList.Where(s => !s.IsRemoved).ToList();
+            slotList = slotList.Where(s => !s.IsRemoved || s.Kind == TemplateSlotKind.Pict).ToList();
 
         var list = slotList.Select(s => ToDto(s, forceFullMetadata: asBase)).ToList();
 
@@ -173,7 +178,11 @@ internal static class TemplateLayoutStore
 
     private static TemplateSlotOverrideDto ToDto(TemplateSlot s, bool forceFullMetadata)
     {
-        bool full = s.IsEmbedded || forceFullMetadata || s.Kind == TemplateSlotKind.Pict;
+        bool full =
+            s.IsEmbedded
+            || forceFullMetadata
+            || s.Kind == TemplateSlotKind.Pict
+            || (s.Kind == TemplateSlotKind.Text && s.IsEmbedded);
         bool pict = s.Kind == TemplateSlotKind.Pict;
         var dto = new TemplateSlotOverrideDto
         {
@@ -184,6 +193,7 @@ internal static class TemplateLayoutStore
             Height = pict ? LayoutUtil.PictSize : Math.Max(8, Snap(s.Height)),
             Removed = s.IsRemoved,
             Embedded = full,
+            Comment = string.IsNullOrEmpty(s.Comment) ? null : s.Comment,
         };
 
         if (full)
@@ -225,7 +235,11 @@ internal static class TemplateLayoutStore
         }
 
         if (replaceBase)
+        {
+            // Replaced base is authoritative. EnsurePictSlots still runs so remaining
+            // active Picts get overlap fixes, but removed Pict tombstones block recreation.
             return TemplateSlotLayout.EnsurePictSlots(MaterializeBase(overrides, expanded));
+        }
 
         var byId = overrides.ToDictionary(o => o.Id, StringComparer.OrdinalIgnoreCase);
         var defaultIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -252,6 +266,8 @@ internal static class TemplateLayoutStore
                 }
 
                 slot.IsRemoved = o.Removed;
+                if (o.Comment is not null)
+                    slot.Comment = o.Comment;
             }
 
             result.Add(slot);
@@ -269,7 +285,8 @@ internal static class TemplateLayoutStore
             result.Add(FromEmbeddedDto(o));
         }
 
-        return result;
+        // Overrides may restore old X that collide with Pict — resolve after merge.
+        return TemplateSlotLayout.EnsurePictSlots(result);
     }
 
     /// <summary>Full base replacement: use saved slots; keep IsIgnored from matching defaults when possible.</summary>
@@ -322,6 +339,7 @@ internal static class TemplateLayoutStore
             Id = id,
             Suffix = suffix,
             Label = o.Label ?? string.Empty,
+            Comment = o.Comment ?? string.Empty,
             Kind = o.Kind,
             X = Snap(o.X),
             Y = Snap(o.Y),

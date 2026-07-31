@@ -6,9 +6,11 @@ internal sealed class OrganizationFieldGroupTemplate : IFieldGroupTemplate
 {
     public const string TemplateName = "Organization";
 
-    private static readonly string[] ContactSuffixes = ["Phone", "Fax", "Telex", "E_mail", "mail"];
+    private static readonly string[] ContactSuffixes = ContactFieldGroupTemplate.Suffixes;
+
     private readonly AddressFieldGroupTemplate _address = new();
     private readonly IdentityCardFieldGroupTemplate _identityCard = new();
+    private readonly ContactFieldGroupTemplate _contact = new();
 
     public string Name => TemplateName;
 
@@ -27,14 +29,23 @@ internal sealed class OrganizationFieldGroupTemplate : IFieldGroupTemplate
         int baseX,
         int startY,
         int maxWidth,
-        HashSet<string> ignoreFields
+        HashSet<string> ignoreFields,
+        bool suppressFieldComments = false
     )
     {
         if (TemplateLayoutStore.HasOverrides(TemplateName))
         {
             var visibleForSlots = fields.Where(f => LayoutUtil.IsVisible(f, ignoreFields) && !LayoutUtil.IsBlockType(f)).ToList();
             var slots = GetPreviewSlots(ignoreFields);
-            return TemplateSlotLayout.Apply(block, visibleForSlots, slots, baseX, startY, maxWidth);
+            return TemplateSlotLayout.Apply(
+                block,
+                visibleForSlots,
+                slots,
+                baseX,
+                startY,
+                maxWidth,
+                suppressFieldComments: suppressFieldComments
+            );
         }
 
         int y = startY;
@@ -50,7 +61,7 @@ internal sealed class OrganizationFieldGroupTemplate : IFieldGroupTemplate
         {
             int h = LayoutUtil.HeightFor(f);
             int w = Math.Min(LayoutUtil.WidthFor(f, maxWidth), maxWidth);
-            string comment = LayoutUtil.ExtractComment(f.FieldElement.ElementValue);
+            string? comment = suppressFieldComments ? null : LayoutUtil.ExtractComment(f.FieldElement.ElementValue);
             block.Fields.Add(LayoutUtil.DataField(f, baseX, y, w, h, comment));
             used.Add(f.FieldElement.ElementName);
             y += h + 8;
@@ -108,20 +119,17 @@ internal sealed class OrganizationFieldGroupTemplate : IFieldGroupTemplate
 
         if (contacts.Count > 0)
         {
-            int x = baseX;
-            int slot = Math.Max(80, (maxWidth - 8) / Math.Max(1, contacts.Count));
+            y = ContactFieldGroupTemplate.LayoutContactFields(
+                block,
+                contacts,
+                baseX,
+                y,
+                maxWidth,
+                ignoreFields,
+                suppressFieldComments
+            );
             foreach (var c in contacts)
-            {
-                string label = LayoutUtil.ExtractComment(c.FieldElement.ElementValue);
-                if (string.IsNullOrEmpty(label))
-                    label = LayoutUtil.ShortLabel(LayoutUtil.GetLastToken(c.FieldElement.ElementName));
-                int w = Math.Min(slot - 4, LayoutUtil.WidthFor(c, slot - 4));
-                block.Fields.Add(LayoutUtil.DataField(c, x, y, w, Consts.DefaultHeightData, label));
                 used.Add(c.FieldElement.ElementName);
-                x += w + 4;
-            }
-
-            y += Consts.DefaultHeightData + 8;
         }
 
         // Nested IdentityCard / Address by first appearance order
@@ -192,6 +200,7 @@ internal sealed class OrganizationFieldGroupTemplate : IFieldGroupTemplate
                 Id = TemplateSlot.MakeId(TemplateSlotKind.Data, TemplateName, "OrganizationName"),
                 Suffix = "OrganizationName",
                 Label = "OrganizationName",
+                Comment = LayoutUtil.DefaultFieldComment("OrganizationName", TemplateName),
                 Kind = TemplateSlotKind.Data,
                 X = 4,
                 Y = 4,
@@ -235,6 +244,17 @@ internal sealed class OrganizationFieldGroupTemplate : IFieldGroupTemplate
         }
 
         y += Consts.DefaultHeightData + 8;
+
+        var contactSlots = _contact.GetDefaultPreviewSlots(ignoreFields);
+        foreach (var s in contactSlots)
+        {
+            var c = s.Clone();
+            c.Y = y + (s.Y - TemplateSlotLayout.OriginY);
+            slots.Add(c);
+        }
+
+        int contactH = contactSlots.Count > 0 ? contactSlots.Max(s => s.Y + s.Height) - TemplateSlotLayout.OriginY : 0;
+        y += contactH + 8;
 
         var idSlots = _identityCard.GetDefaultPreviewSlots(ignoreFields);
         foreach (var s in idSlots)

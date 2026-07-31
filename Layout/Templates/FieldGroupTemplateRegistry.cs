@@ -14,6 +14,7 @@ internal sealed class FieldGroupTemplateRegistry
         [
             _precedingDoc,
             new IdentityCardFieldGroupTemplate(),
+            new ContactFieldGroupTemplate(),
             new AddressFieldGroupTemplate(),
             new CustomsDocIdFieldGroupTemplate(),
             new PiDocumentNumberFieldGroupTemplate(),

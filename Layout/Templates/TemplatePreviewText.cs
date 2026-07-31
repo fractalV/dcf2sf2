@@ -8,6 +8,7 @@ namespace DcfToSf2.Layout.Templates;
 internal static class TemplatePreviewText
 {
     public const string RemovedPrefix = "REMOVED ";
+    public const string IgnoredPrefix = "IGNORED ";
 
     private static readonly Regex LineRegex = new(
         @"^(?<type>Data|Text|Pict|Line|Rect)(?<x>\s*-?\d+)(?<y>\s*-?\d+)(?<w>\s*-?\d+)(?<h>\s*-?\d+)(?<rest>.*)$",
@@ -18,24 +19,32 @@ internal static class TemplatePreviewText
 
     public static string Render(IReadOnlyList<TemplateSlot> slots, int maxWidth = 770)
     {
-        var fields = BuildSyntheticFields(slots);
-        var block = new Block { Name = "PREVIEW" };
-        TemplateSlotLayout.Apply(
-            block,
-            fields,
-            slots,
-            Consts.Default_X,
-            Consts.Default_Y,
-            maxWidth,
-            addPict: true
-        );
+        // Text mode must mirror canvas slot geometry 1:1.
+        // Do not route through TemplateSlotLayout.Apply (compaction / flow / pict reflow).
+        _ = maxWidth;
+        var list = EnsurePictSlotsForPreview(slots);
 
         var sb = new StringBuilder();
-        string active = block.ToString().TrimEnd();
-        if (!string.IsNullOrEmpty(active))
-            sb.Append(active);
+        foreach (
+            var slot in list
+                .Where(s => !s.IsIgnored && !s.IsRemoved)
+                .OrderBy(s => s.Y)
+                .ThenBy(s => s.X)
+                .ThenBy(s => (int)s.Kind)
+        )
+        {
+            if (sb.Length > 0)
+                sb.AppendLine();
+            sb.Append(FormatSlotLine(slot));
+        }
 
-        foreach (var slot in slots.Where(s => s.IsRemoved && !s.IsIgnored))
+        // REMOVED Data/Text can be restored from text; removed Picts are silent tombstones
+        // (deleting their line must not bring "REMOVED Pict" back on Apply).
+        foreach (
+            var slot in slots.Where(s =>
+                s.IsRemoved && !s.IsIgnored && s.Kind != TemplateSlotKind.Pict
+            )
+        )
         {
             if (sb.Length > 0)
                 sb.AppendLine();
@@ -43,7 +52,42 @@ internal static class TemplatePreviewText
             sb.Append(FormatSlotLine(slot));
         }
 
+        // Ignored-from-list slots; omitted once dismissed (IsRemoved) via deleting IGNORED lines.
+        foreach (var slot in slots.Where(s => s.IsIgnored && !s.IsRemoved))
+        {
+            if (sb.Length > 0)
+                sb.AppendLine();
+            sb.Append(IgnoredPrefix);
+            sb.Append(FormatSlotLine(slot));
+        }
+
         return sb.ToString();
+    }
+
+    /// <summary>Add missing default Picts for text preview without FixPictOverlaps (keeps Data X stable).</summary>
+    private static List<TemplateSlot> EnsurePictSlotsForPreview(IReadOnlyList<TemplateSlot> slots)
+    {
+        var list = slots.Select(s => s.Clone()).ToList();
+        var pictKeys = new HashSet<string>(
+            list.Where(s => s.Kind == TemplateSlotKind.Pict).Select(s =>
+                $"{s.Group}\0{s.Suffix}\0{s.StemHint}"
+            ),
+            StringComparer.OrdinalIgnoreCase
+        );
+
+        foreach (var data in list.Where(s => s.Kind == TemplateSlotKind.Data && !s.IsExcluded).ToList())
+        {
+            if (!LayoutUtil.ShouldAddPict(data.Suffix))
+                continue;
+            string key = $"{data.Group}\0{data.Suffix}\0{data.StemHint}";
+            if (pictKeys.Contains(key))
+                continue;
+
+            list.Add(TemplateSlotLayout.CreateDefaultPictSlot(data));
+            pictKeys.Add(key);
+        }
+
+        return list;
     }
 
     public static ApplyResult ApplyToSlots(string text, IList<TemplateSlot> slots)
@@ -52,16 +96,10 @@ internal static class TemplatePreviewText
         int updated = 0;
         int unmatched = 0;
 
-        // Include removed so REMOVED lines and restore via plain Data/Text both work.
-        var dataSlots = slots
-            .Where(s => s.Kind == TemplateSlotKind.Data && !s.IsIgnored)
-            .ToList();
-        var textSlots = slots
-            .Where(s => s.Kind == TemplateSlotKind.Text && !s.IsIgnored)
-            .ToList();
-        var pictSlots = slots
-            .Where(s => s.Kind == TemplateSlotKind.Pict && !s.IsIgnored)
-            .ToList();
+        // Include removed/ignored so prefixed lines and geometry sync still work.
+        var dataSlots = slots.Where(s => s.Kind == TemplateSlotKind.Data).ToList();
+        var textSlots = slots.Where(s => s.Kind == TemplateSlotKind.Text).ToList();
+        var pictSlots = slots.Where(s => s.Kind == TemplateSlotKind.Pict).ToList();
         var usedData = new HashSet<TemplateSlot>();
         var usedText = new HashSet<TemplateSlot>();
         var usedPict = new HashSet<TemplateSlot>();
@@ -72,11 +110,21 @@ internal static class TemplatePreviewText
             if (string.IsNullOrWhiteSpace(line))
                 continue;
 
+            // Strip status prefixes (order: REMOVED then IGNORED, or vice versa).
             bool markedRemoved = false;
-            if (line.StartsWith(RemovedPrefix, StringComparison.OrdinalIgnoreCase))
+            for (int i = 0; i < 2; i++)
             {
-                markedRemoved = true;
-                line = line[RemovedPrefix.Length..].TrimStart();
+                if (line.StartsWith(RemovedPrefix, StringComparison.OrdinalIgnoreCase))
+                {
+                    markedRemoved = true;
+                    line = line[RemovedPrefix.Length..].TrimStart();
+                }
+                else if (line.StartsWith(IgnoredPrefix, StringComparison.OrdinalIgnoreCase))
+                {
+                    line = line[IgnoredPrefix.Length..].TrimStart();
+                }
+                else
+                    break;
             }
 
             if (!TryParseLine(line, out var parsed))
@@ -114,7 +162,7 @@ internal static class TemplatePreviewText
                 slot.Y = slotY;
                 slot.Width = LayoutUtil.PictSize;
                 slot.Height = LayoutUtil.PictSize;
-                slot.IsRemoved = markedRemoved;
+                ApplyStatusFlags(slot, markedRemoved);
                 if (!string.IsNullOrEmpty(parsed.ValueName))
                     slot.Label = parsed.ValueName;
                 updated++;
@@ -132,11 +180,12 @@ internal static class TemplatePreviewText
                 }
 
                 usedData.Add(slot);
-                slot.X = slotX;
-                slot.Y = slotY;
+                slot.X = Math.Max(0, slotX);
+                slot.Y = Math.Max(0, slotY);
                 slot.Width = slotW;
                 slot.Height = slotH;
-                slot.IsRemoved = markedRemoved;
+                ApplyStatusFlags(slot, markedRemoved);
+                slot.Comment = parsed.Comment;
                 updated++;
                 continue;
             }
@@ -147,9 +196,15 @@ internal static class TemplatePreviewText
                 var slot = MatchTextSlot(textSlots, usedText, label, slotX, slotY);
                 if (slot is null)
                 {
-                    messages.Add($"Нет слота для Text: {Truncate(label)}");
-                    unmatched++;
-                    continue;
+                    if (markedRemoved || string.IsNullOrWhiteSpace(label))
+                    {
+                        messages.Add($"Нет слота для Text: {Truncate(label)}");
+                        unmatched++;
+                        continue;
+                    }
+
+                    slot = CreateUserTextSlot(slots, label, slotX, slotY, slotW, slotH);
+                    textSlots.Add(slot);
                 }
 
                 usedText.Add(slot);
@@ -157,12 +212,89 @@ internal static class TemplatePreviewText
                 slot.Y = slotY;
                 slot.Width = slotW;
                 slot.Height = slotH;
-                slot.IsRemoved = markedRemoved;
+                if (!string.IsNullOrWhiteSpace(label))
+                    slot.Label = label;
+
+                ApplyStatusFlags(slot, markedRemoved);
                 updated++;
             }
         }
 
+        // Deleting an IGNORED line dismisses that slot from the template (same as remove).
+        foreach (var slot in slots)
+        {
+            if (!slot.IsIgnored)
+                continue;
+            bool used =
+                usedData.Contains(slot) || usedText.Contains(slot) || usedPict.Contains(slot);
+            if (!used)
+                slot.IsRemoved = true;
+        }
+
+        // Deleting a Pict line removes it (tombstone). Unlike Data/Text, missing Picts are
+        // auto-recreated by EnsurePictSlots unless IsRemoved is set.
+        foreach (var slot in pictSlots)
+        {
+            if (slot.IsIgnored || usedPict.Contains(slot))
+                continue;
+            slot.IsRemoved = true;
+        }
+
         return new ApplyResult(updated, unmatched, messages);
+    }
+
+    private static TemplateSlot CreateUserTextSlot(
+        IList<TemplateSlot> slots,
+        string label,
+        int x,
+        int y,
+        int width,
+        int height
+    )
+    {
+        string group =
+            slots.Select(s => s.Group).FirstOrDefault(g => !string.IsNullOrEmpty(g)) ?? "Custom";
+        string key = NextUserTextKey(slots);
+        var slot = TemplateSlotLayout.TextSlot(
+            group,
+            label,
+            x,
+            y,
+            Math.Max(16, width),
+            Math.Max(8, height),
+            key
+        );
+        slot.IsEmbedded = true;
+        slots.Add(slot);
+        return slot;
+    }
+
+    internal static string NextUserTextKey(IEnumerable<TemplateSlot> slots)
+    {
+        var used = new HashSet<string>(
+            slots.Where(s => s.Kind == TemplateSlotKind.Text).Select(s => s.Suffix),
+            StringComparer.OrdinalIgnoreCase
+        );
+        for (int n = 1; n < 100_000; n++)
+        {
+            string key = $"usertext:{n}";
+            if (!used.Contains(key))
+                return key;
+        }
+
+        return $"usertext:{Guid.NewGuid():N}";
+    }
+
+    /// <summary>
+    /// IGNORED lines keep IsIgnored from the ignore-list; presence restores a dismissed slot.
+    /// REMOVED applies only to non-ignored slots.
+    /// </summary>
+    private static void ApplyStatusFlags(TemplateSlot slot, bool markedRemoved)
+    {
+        if (slot.IsIgnored)
+            slot.IsRemoved = false;
+        else
+            slot.IsRemoved = markedRemoved;
     }
 
     private static string FormatSlotLine(TemplateSlot slot)
@@ -197,37 +329,15 @@ internal static class TemplatePreviewText
         else
         {
             sb.Append(TemplateSlotLayout.PictFieldName(slot));
+            if (!string.IsNullOrEmpty(slot.Comment))
+            {
+                sb.Append(' ');
+                sb.Append(Consts.SpecialDelimetr);
+                sb.Append(slot.Comment);
+            }
         }
 
         return sb.ToString();
-    }
-
-    private static List<Data> BuildSyntheticFields(IReadOnlyList<TemplateSlot> slots)
-    {
-        var fields = new List<Data>();
-        foreach (var slot in slots)
-        {
-            if (slot.Kind != TemplateSlotKind.Data || slot.IsExcluded)
-                continue;
-
-            string name = string.IsNullOrEmpty(slot.StemHint)
-                ? slot.Suffix
-                : $"{slot.StemHint}_{slot.Suffix}";
-            bool isDate = slot.Suffix.EndsWith("Date", StringComparison.OrdinalIgnoreCase);
-            string value = isDate ? "D10 |" : $"C{Math.Max(1, slot.Width / Consts.DefaultWidthChar)} |";
-            fields.Add(
-                new Data
-                {
-                    Level = 0,
-                    NameBlock = "PREVIEW",
-                    Path = "PREVIEW",
-                    FieldElement = new Element { ElementName = name, ElementValue = value },
-                    SourceLine = 0,
-                }
-            );
-        }
-
-        return fields;
     }
 
     private static TemplateSlot? MatchPictSlot(
@@ -326,7 +436,8 @@ internal static class TemplatePreviewText
         int Width,
         int Height,
         string ValueName,
-        string TextLabel
+        string TextLabel,
+        string Comment
     );
 
     private static bool TryParseLine(string line, out ParsedLine parsed)
@@ -357,11 +468,14 @@ internal static class TemplatePreviewText
         string rest = m.Groups["rest"].Value.TrimStart();
         string valueName = string.Empty;
         string textLabel = string.Empty;
+        string comment = string.Empty;
 
         if (type == Type.Data)
         {
             int tick = rest.IndexOf(Consts.SpecialDelimetr);
             valueName = (tick >= 0 ? rest[..tick] : rest).Trim();
+            if (tick >= 0)
+                comment = rest[(tick + 1)..].Trim();
             int space = valueName.IndexOf(' ');
             if (space > 0)
                 valueName = valueName[..space];
@@ -375,7 +489,7 @@ internal static class TemplatePreviewText
             valueName = rest.TrimStart(Consts.SpecialDelimetr).Trim();
         }
 
-        parsed = new ParsedLine(type, x, y, w, h, valueName, textLabel);
+        parsed = new ParsedLine(type, x, y, w, h, valueName, textLabel, comment);
         return true;
     }
 

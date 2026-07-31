@@ -10,14 +10,16 @@ internal sealed class IdentityCardFieldGroupTemplate : IFieldGroupTemplate
     public static readonly string[] Suffixes =
     [
         "IdentityCardCode",
+        "IdentityCardName",
         "IdentityCardSeries",
         "IdentityCardNumber",
         "IdentityCardDate",
-        "DocValidityDate",
+        "CountryCode",
         "OrganizationName",
         "IssuerCode",
         "AuthorityId",
-        "CountryCode",
+        "DocValidityDate",
+        "FullIdentityCardName",
     ];
 
     private static readonly HashSet<string> SuffixSet = new(Suffixes, StringComparer.OrdinalIgnoreCase);
@@ -119,19 +121,24 @@ internal sealed class IdentityCardFieldGroupTemplate : IFieldGroupTemplate
         if (TemplateLayoutStore.HasOverrides(TemplateName))
         {
             var slots = new IdentityCardFieldGroupTemplate().GetPreviewSlots(ignoreFields);
-            return TemplateSlotLayout.Apply(block, fields, slots, baseX, y, maxWidth);
+            var idOnly = fields
+                .Where(f => IdentityCardFieldGroupTemplate.IsIdentityCardField(f.FieldElement.ElementName))
+                .ToList();
+            return TemplateSlotLayout.Apply(block, idOnly, slots, baseX, y, maxWidth);
         }
 
         Data? Find(string suffix) => LayoutUtil.FindBySuffix(fields, suffix);
 
+        // Alta Soft: Code | Name | Series | Number | Date | CountryCode on one row
         y = LayoutUtil.PlaceCompactRow(
             block,
             [
-                (Find("IdentityCardCode"), 44),
-                (Find("IdentityCardSeries"), 60),
-                (Find("IdentityCardNumber"), 120),
+                (Find("IdentityCardCode"), 24),
+                (Find("IdentityCardName"), 124),
+                (Find("IdentityCardSeries"), 92),
+                (Find("IdentityCardNumber"), 204),
                 (Find("IdentityCardDate"), 84),
-                (Find("DocValidityDate"), 84),
+                (Find("CountryCode"), 20),
             ],
             baseX,
             y,
@@ -141,10 +148,20 @@ internal sealed class IdentityCardFieldGroupTemplate : IFieldGroupTemplate
         y = LayoutUtil.PlaceCompactRow(
             block,
             [
-                (Find("OrganizationName"), Math.Min(280, maxWidth / 2)),
+                (Find("OrganizationName"), Math.Min(544, maxWidth - 220)),
                 (Find("IssuerCode"), 60),
-                (Find("AuthorityId"), 100),
-                (Find("CountryCode"), 32),
+                (Find("AuthorityId"), 148),
+            ],
+            baseX,
+            y,
+            maxWidth
+        );
+
+        y = LayoutUtil.PlaceCompactRow(
+            block,
+            [
+                (Find("FullIdentityCardName"), Math.Min(248, maxWidth - 8)),
+                (Find("DocValidityDate"), 84),
             ],
             baseX,
             y,
@@ -165,18 +182,15 @@ internal sealed class IdentityCardFieldGroupTemplate : IFieldGroupTemplate
         AddressFieldGroupTemplate.CompactRows(
             [
                 [
-                    ("IdentityCardCode", 44),
-                    ("IdentityCardSeries", 60),
-                    ("IdentityCardNumber", 120),
+                    ("IdentityCardCode", 24),
+                    ("IdentityCardName", 124),
+                    ("IdentityCardSeries", 92),
+                    ("IdentityCardNumber", 204),
                     ("IdentityCardDate", 84),
-                    ("DocValidityDate", 84),
+                    ("CountryCode", 20),
                 ],
-                [
-                    ("OrganizationName", 280),
-                    ("IssuerCode", 60),
-                    ("AuthorityId", 100),
-                    ("CountryCode", 32),
-                ],
+                [("OrganizationName", 544), ("IssuerCode", 60), ("AuthorityId", 148)],
+                [("FullIdentityCardName", 248), ("DocValidityDate", 84)],
             ],
             ignoreFields,
             TemplateName

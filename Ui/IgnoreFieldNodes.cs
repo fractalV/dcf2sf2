@@ -10,24 +10,67 @@ internal sealed class IgnoreBlockNode : INotifyPropertyChanged
     private bool _updating;
     private bool _hasPatternMatch;
 
-    public IgnoreBlockNode(string path, string title, List<IgnoreFieldNode> fields)
+    public IgnoreBlockNode(
+        string path,
+        string title,
+        List<IgnoreFieldNode> fields,
+        List<IgnoreBlockNode>? childBlocks = null,
+        string? sectionKey = null
+    )
     {
         Path = path;
         Title = title;
+        SectionKey = sectionKey;
         Fields = fields;
-        foreach (var f in fields)
+        ChildBlocks = childBlocks ?? [];
+        foreach (var f in Fields)
             f.Parent = this;
+        foreach (var c in ChildBlocks)
+            c.ParentBlock = this;
         RefreshCheckState();
     }
 
     public string Path { get; }
     public string Title { get; }
-    public string Header =>
-        string.Equals(Title, LeafName(Path), StringComparison.OrdinalIgnoreCase)
-            ? Path
-            : $"{Path} — {Title}";
+
+    /// <summary>Non-null when this node is a B-block section (e.g. GTDID), not a DCF path segment.</summary>
+    public string? SectionKey { get; }
+
+    public bool IsSection => !string.IsNullOrEmpty(SectionKey);
+
+    public IgnoreBlockNode? ParentBlock { get; set; }
+
+    public string Header
+    {
+        get
+        {
+            if (IsSection)
+            {
+                string key = SectionKey!;
+                return string.IsNullOrWhiteSpace(Title)
+                    || Title.Equals(key, StringComparison.OrdinalIgnoreCase)
+                    ? key
+                    : $"{key} — {Title}";
+            }
+
+            string leaf = LeafName(Path);
+            bool nested = ParentBlock is not null;
+            string name = nested ? leaf : Path;
+            return string.Equals(Title, leaf, StringComparison.OrdinalIgnoreCase)
+                || string.IsNullOrWhiteSpace(Title)
+                ? name
+                : $"{name} — {Title}";
+        }
+    }
 
     public List<IgnoreFieldNode> Fields { get; }
+    public List<IgnoreBlockNode> ChildBlocks { get; }
+
+    /// <summary>Child path/section nodes first, then fields — for TreeView binding.</summary>
+    public IEnumerable<object> Children => ChildBlocks.Cast<object>().Concat(Fields);
+
+    public IEnumerable<IgnoreFieldNode> AllFields() =>
+        Fields.Concat(ChildBlocks.SelectMany(c => c.AllFields()));
 
     public bool HasPatternMatch
     {
@@ -61,9 +104,13 @@ internal sealed class IgnoreBlockNode : INotifyPropertyChanged
         _updating = true;
         try
         {
-            int checkedCount = Fields.Count(f => f.IsChecked);
-            IsChecked = checkedCount == 0 ? false : checkedCount == Fields.Count ? true : null;
-            HasPatternMatch = Fields.Any(f => f.IsPatternMatch);
+            foreach (var child in ChildBlocks)
+                child.RefreshCheckState();
+
+            var all = AllFields().ToList();
+            int checkedCount = all.Count(f => f.IsChecked);
+            IsChecked = all.Count == 0 ? false : checkedCount == 0 ? false : checkedCount == all.Count ? true : null;
+            HasPatternMatch = all.Any(f => f.IsPatternMatch);
         }
         finally
         {

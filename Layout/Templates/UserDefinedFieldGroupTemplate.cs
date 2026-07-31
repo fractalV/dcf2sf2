@@ -151,6 +151,9 @@ internal sealed class UserDefinedFieldGroupTemplate : IFieldGroupTemplate
                     Id = TemplateSlot.MakeId(TemplateSlotKind.Data, Name, f.Suffix),
                     Suffix = f.Suffix,
                     Label = string.IsNullOrWhiteSpace(f.Label) ? f.Suffix : f.Label,
+                    Comment = !string.IsNullOrWhiteSpace(f.Label) && !f.Label.Equals(f.Suffix, StringComparison.Ordinal)
+                        ? f.Label
+                        : LayoutUtil.DefaultFieldComment(f.Suffix, Name),
                     Kind = TemplateSlotKind.Data,
                     X = x,
                     Y = y,
@@ -163,9 +166,7 @@ internal sealed class UserDefinedFieldGroupTemplate : IFieldGroupTemplate
 
             if (!ignored)
             {
-                x += w + 4;
-                if (LayoutUtil.ShouldAddPict(f.Suffix))
-                    x += LayoutUtil.PictSize + LayoutUtil.PictGap;
+                x += LayoutUtil.AdvanceAfterData(w, f.Suffix);
                 rowH = Math.Max(rowH, h);
             }
         }

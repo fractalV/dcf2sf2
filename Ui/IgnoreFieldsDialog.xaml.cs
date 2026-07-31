@@ -31,7 +31,7 @@ internal partial class IgnoreFieldsDialog : Window
             .Where(s => !DcfParser.IsIgnorePattern(s))
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
 
-        _blocks = BuildNodes(parsed, _manualChecked);
+        _blocks = IgnoreFieldsTreeBuilder.Build(parsed, _manualChecked);
         FieldsTree.ItemsSource = _blocks;
 
         var patterns = SelectedFields
@@ -42,62 +42,6 @@ internal partial class IgnoreFieldsDialog : Window
         _ready = true;
         SyncTreeWithPatterns();
         UpdateSummary();
-    }
-
-    private static List<IgnoreBlockNode> BuildNodes(DcfParseResult parsed, HashSet<string> manualChecked)
-    {
-        var groups = parsed
-            .Fields.Where(f => !IsBlockOpenMarker(f) && !DcfParser.IsBuiltInServiceField(f.FieldElement.ElementName))
-            .GroupBy(f => string.IsNullOrWhiteSpace(f.Path) ? Consts.DefaultBlockName : f.Path, StringComparer.OrdinalIgnoreCase)
-            .OrderBy(g => g.Key, StringComparer.OrdinalIgnoreCase);
-
-        var blocks = new List<IgnoreBlockNode>();
-        foreach (var group in groups)
-        {
-            string title =
-                group.Select(f => f.RusNameBlock).FirstOrDefault(s => !string.IsNullOrWhiteSpace(s))
-                ?? IgnoreBlockNode.LeafName(group.Key);
-
-            var fields = group
-                .Select(f =>
-                {
-                    string name = f.FieldElement.ElementName;
-                    string label = ExtractComment(f.FieldElement.ElementValue);
-                    if (string.IsNullOrWhiteSpace(label))
-                        label = DcfParser.GetLastToken(name);
-
-                    return new IgnoreFieldNode(name, label, manualChecked.Contains(name));
-                })
-                .OrderBy(f => f.Name, StringComparer.OrdinalIgnoreCase)
-                .ToList();
-
-            if (fields.Count == 0)
-                continue;
-
-            blocks.Add(new IgnoreBlockNode(group.Key, title, fields));
-        }
-
-        return blocks;
-    }
-
-    private static bool IsBlockOpenMarker(Data f) =>
-        string.IsNullOrEmpty(f.FieldElement.ElementValue) && !string.IsNullOrEmpty(f.FieldElement.ElementName);
-
-    private static string ExtractComment(string elementValue)
-    {
-        int pipe = elementValue.IndexOf('|');
-        if (pipe < 0)
-            return string.Empty;
-
-        string c = elementValue[(pipe + 1)..].Trim().TrimStart('*', '!').Trim();
-        foreach (var key in new[] { "NAMESPACE=", "PATTERN=", "SEQ=", "CHOICE=", "PRNT=", "MAX=", "OPT=" })
-        {
-            int i = c.IndexOf(key, StringComparison.OrdinalIgnoreCase);
-            if (i >= 0)
-                c = c[..i].Trim();
-        }
-
-        return c;
     }
 
     private void TreeNode_PreviewMouseDown(object sender, MouseButtonEventArgs e)
@@ -147,7 +91,7 @@ internal partial class IgnoreFieldsDialog : Window
             return;
         }
 
-        if (block.Fields.Count == 0)
+        if (block.AllFields().Any() == false)
         {
             MessageBox.Show(
                 this,
@@ -159,7 +103,9 @@ internal partial class IgnoreFieldsDialog : Window
             return;
         }
 
-        string defaultName = IgnoreBlockNode.LeafName(block.Path);
+        string defaultName = block.IsSection
+            ? block.SectionKey!
+            : IgnoreBlockNode.LeafName(block.Path);
         if (!TryPromptTemplateName(defaultName, out string templateName))
             return;
 
@@ -174,7 +120,7 @@ internal partial class IgnoreFieldsDialog : Window
             .GroupBy(f => f.FieldElement.ElementName, StringComparer.OrdinalIgnoreCase)
             .ToDictionary(g => g.Key, g => g.First(), StringComparer.OrdinalIgnoreCase);
 
-        var fieldTuples = block.Fields
+        var fieldTuples = block.AllFields()
             .Select(f =>
             {
                 byName.TryGetValue(f.Name, out var data);
@@ -297,7 +243,7 @@ internal partial class IgnoreFieldsDialog : Window
 
     private void SelectAll_Click(object sender, RoutedEventArgs e)
     {
-        foreach (var field in _blocks.SelectMany(b => b.Fields))
+        foreach (var field in _blocks.SelectMany(b => b.AllFields()))
             _manualChecked.Add(field.Name);
         SyncTreeWithPatterns();
         UpdateSummary();
@@ -313,7 +259,7 @@ internal partial class IgnoreFieldsDialog : Window
     private void AddSuffixPatterns_Click(object sender, RoutedEventArgs e)
     {
         var suffixes = _blocks
-            .SelectMany(b => b.Fields)
+            .SelectMany(b => b.AllFields())
             .Where(f => f.IsChecked)
             .Select(f => DcfParser.GetLastToken(f.Name))
             .Where(s => !string.IsNullOrWhiteSpace(s))
@@ -358,7 +304,7 @@ internal partial class IgnoreFieldsDialog : Window
         {
             foreach (var block in _blocks)
             {
-                foreach (var field in block.Fields)
+                foreach (var field in block.AllFields())
                 {
                     bool byPattern = patterns.Any(p => DcfParser.MatchesIgnorePattern(p, field.Name));
                     field.IsPatternMatch = byPattern;
@@ -420,7 +366,7 @@ internal partial class IgnoreFieldsDialog : Window
     {
         var patterns = ParsePatternsBox().Where(DcfParser.IsIgnorePattern).ToHashSet(StringComparer.OrdinalIgnoreCase);
         var fields = _blocks
-            .SelectMany(b => b.Fields)
+            .SelectMany(b => b.AllFields())
             .Where(f => f.IsChecked)
             .Select(f => f.Name)
             .Where(name => !patterns.Any(p => DcfParser.MatchesIgnorePattern(p, name)))
@@ -465,7 +411,7 @@ internal partial class IgnoreFieldsDialog : Window
             _suppressBlockEvents = true;
             try
             {
-                field.Parent?.RefreshCheckState();
+                RefreshBlockAndAncestors(field.Parent);
             }
             finally
             {
@@ -489,7 +435,7 @@ internal partial class IgnoreFieldsDialog : Window
         _suppressBlockEvents = true;
         try
         {
-            foreach (var field in block.Fields)
+            foreach (var field in block.AllFields())
             {
                 if (value)
                     _manualChecked.Add(field.Name);
@@ -500,6 +446,7 @@ internal partial class IgnoreFieldsDialog : Window
             }
 
             block.RefreshCheckState();
+            RefreshBlockAndAncestors(block.ParentBlock);
         }
         finally
         {
@@ -509,13 +456,22 @@ internal partial class IgnoreFieldsDialog : Window
         UpdateSummary();
     }
 
+    private static void RefreshBlockAndAncestors(IgnoreBlockNode? block)
+    {
+        while (block is not null)
+        {
+            block.RefreshCheckState();
+            block = block.ParentBlock;
+        }
+    }
+
     private void UpdateSummary()
     {
         if (!_ready)
             return;
 
-        int fieldCount = _blocks.SelectMany(b => b.Fields).Count(f => f.IsChecked);
-        int patternMatched = _blocks.SelectMany(b => b.Fields).Count(f => f.IsPatternMatch);
+        int fieldCount = _blocks.SelectMany(b => b.AllFields()).Count(f => f.IsChecked);
+        int patternMatched = _blocks.SelectMany(b => b.AllFields()).Count(f => f.IsPatternMatch);
         int patternCount = ParsePatternsBox().Count(DcfParser.IsIgnorePattern);
 
         if (fieldCount == 0 && patternCount == 0)
