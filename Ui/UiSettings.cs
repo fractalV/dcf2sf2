@@ -15,6 +15,7 @@ internal sealed class UiSettings
     public string? LastOutputDir { get; set; }
     public bool TwoColumn { get; set; }
     public bool ForceList { get; set; }
+    public bool Modernize { get; set; }
 
     /// <summary>Last selected ignore fields (also used when no per-file entry).</summary>
     public List<string> IgnoreFields { get; set; } = [];

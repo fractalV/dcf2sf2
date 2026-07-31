@@ -63,12 +63,19 @@ internal static class Program
             Description = "Перезаписать List.sf2 если уже существует",
         };
 
+        var modernizeOption = new Option<bool>("--modernize")
+        {
+            Description =
+                "Дополнить существующий SF2 новыми блоками из DCF (остальные секции не трогать)",
+        };
+
         var rootCommand = new RootCommand("Утилита для конвертации dcf в sf2");
         rootCommand.Options.Add(fileOption);
         rootCommand.Options.Add(outOption);
         rootCommand.Options.Add(twoColumnOption);
         rootCommand.Options.Add(ignoreOption);
         rootCommand.Options.Add(forceListOption);
+        rootCommand.Options.Add(modernizeOption);
 
         rootCommand.SetAction(parseResult =>
         {
@@ -85,6 +92,7 @@ internal static class Program
                 OutputDirectory = output,
                 TwoColumn = parseResult.GetValue(twoColumnOption),
                 ForceList = parseResult.GetValue(forceListOption),
+                Modernize = parseResult.GetValue(modernizeOption),
                 IgnoreFields = ConversionOptions.ParseIgnoreFields(
                     parseResult.GetValue(ignoreOption)
                 ),

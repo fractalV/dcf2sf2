@@ -6,6 +6,10 @@ internal sealed class ConversionOptions
     public required DirectoryInfo OutputDirectory { get; init; }
     public bool TwoColumn { get; init; }
     public bool ForceList { get; init; }
+    /// <summary>
+    /// Append only blocks missing from an existing SF2; leave existing sections untouched.
+    /// </summary>
+    public bool Modernize { get; init; }
     public HashSet<string> IgnoreFields { get; init; } = new(StringComparer.OrdinalIgnoreCase);
 
     public static HashSet<string> ParseIgnoreFields(string? value)

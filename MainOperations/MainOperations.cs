@@ -46,6 +46,9 @@ internal static class MainOperations
 
             var document = Sf2LayoutBuilder.Build(parsed, options);
 
+            if (options.Modernize)
+                return Sf2Modernizer.Apply(options.OutputDirectory, document, log);
+
             if (writePreview)
             {
                 foreach (var line in Sf2Writer.Render(document))

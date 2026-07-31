@@ -35,6 +35,7 @@ public partial class MainWindow : Window
                 OutputDirBox.Text = _settings.LastOutputDir;
             TwoColumnBox.IsChecked = _settings.TwoColumn;
             ForceListBox.IsChecked = _settings.ForceList;
+            ModernizeBox.IsChecked = _settings.Modernize;
 
             _ignoreFields = _settings.GetIgnoreFieldsFor(InputFileBox.Text);
             RefreshIgnoreFieldsSummary();
@@ -69,6 +70,7 @@ public partial class MainWindow : Window
             : OutputDirBox.Text.Trim();
         _settings.TwoColumn = TwoColumnBox.IsChecked == true;
         _settings.ForceList = ForceListBox.IsChecked == true;
+        _settings.Modernize = ModernizeBox.IsChecked == true;
         _settings.SetIgnoreFieldsFor(InputFileBox.Text, _ignoreFields);
         _settings.Save();
     }
@@ -298,12 +300,18 @@ public partial class MainWindow : Window
             OutputDirectory = outputDir,
             TwoColumn = TwoColumnBox.IsChecked == true,
             ForceList = ForceListBox.IsChecked == true,
+            Modernize = ModernizeBox.IsChecked == true,
             IgnoreFields = new HashSet<string>(_ignoreFields, StringComparer.OrdinalIgnoreCase),
         };
 
         ConvertButton.IsEnabled = false;
         ClearLog();
-        AppendLog($"Конвертация: {inputFile.FullName}", ConversionLogLevel.Info);
+        AppendLog(
+            options.Modernize
+                ? $"Модернизация: {inputFile.FullName}"
+                : $"Конвертация: {inputFile.FullName}",
+            ConversionLogLevel.Info
+        );
         if (_ignoreFields.Count > 0)
             AppendLog($"Игнорируются поля: {IgnoreFieldsBox.Text}", ConversionLogLevel.Info);
 

@@ -15,6 +15,7 @@
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
         <Grid.ColumnDefinitions>
@@ -62,17 +63,23 @@
                   Content="Перезаписать List.sf2 если уже существует"
                   Margin="0,0,0,8" />
 
-        <TextBlock Grid.Row="4" Grid.Column="0"
+        <CheckBox x:Name="ModernizeBox"
+                  Grid.Row="4" Grid.Column="0" Grid.ColumnSpan="3"
+                  Content="Модернизация: дополнить существующий SF2 только новыми блоками"
+                  Margin="0,0,0,8"
+                  ToolTip="Не перезаписывает имеющиеся секции; дописывает отсутствующие блоки из DCF и пишет список изменений в лог" />
+
+        <TextBlock Grid.Row="5" Grid.Column="0"
                    Text="Игнорировать поля:"
                    VerticalAlignment="Center"
                    Margin="0,0,8,12" />
         <TextBox x:Name="IgnoreFieldsBox"
-                 Grid.Row="4" Grid.Column="1"
+                 Grid.Row="5" Grid.Column="1"
                  Margin="0,0,8,12"
                  IsReadOnly="True"
                  VerticalContentAlignment="Center"
                  ToolTip="Выбранные поля и шаблоны" />
-        <StackPanel Grid.Row="4" Grid.Column="2"
+        <StackPanel Grid.Row="5" Grid.Column="2"
                     Margin="0,0,0,12">
             <Button Content="Выбрать…"
                     Padding="12,4"
@@ -89,14 +96,14 @@
                     Click="ViewTemplates_Click" />
         </StackPanel>
         <Button x:Name="ConvertButton"
-                Grid.Row="5" Grid.Column="0" Grid.ColumnSpan="3"
+                Grid.Row="6" Grid.Column="0" Grid.ColumnSpan="3"
                 Content="Конвертировать"
                 Padding="16,8"
                 Margin="0,0,0,12"
                 HorizontalAlignment="Left"
                 Click="Convert_Click" />
 
-        <GroupBox Grid.Row="6" Grid.Column="0" Grid.ColumnSpan="3"
+        <GroupBox Grid.Row="7" Grid.Column="0" Grid.ColumnSpan="3"
                   Header="Лог"
                   Padding="4">
             <RichTextBox x:Name="LogBox"
