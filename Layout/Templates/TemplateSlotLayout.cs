@@ -29,7 +29,7 @@ internal static class TemplateSlotLayout
             {
                 if (slot.Kind == TemplateSlotKind.Data)
                 {
-                    var skipped = FindField(fields, slot);
+                    var skipped = FindField(fields, slot, used);
                     if (skipped is not null)
                         used.Add(skipped.FieldElement.ElementName);
                 }
@@ -39,7 +39,13 @@ internal static class TemplateSlotLayout
 
             int x = baseX + slot.X - OriginX;
             int y = startY + slot.Y - OriginY;
-            int w = Math.Min(slot.Width, Math.Max(16, baseX + maxWidth - x));
+            int contentRight = baseX + maxWidth;
+            // Saved / FixPictOverlaps layouts can push slots far past the block — skip them
+            // without consuming the DCF field so rest/flow can still place it.
+            if (x >= contentRight)
+                continue;
+
+            int w = Math.Min(slot.Width, Math.Max(16, contentRight - x));
             int h = Math.Max(8, slot.Height);
 
             if (slot.Kind == TemplateSlotKind.Text)
@@ -70,6 +76,7 @@ internal static class TemplateSlotLayout
                     continue;
 
                 // Pict must reference a real Data field name — never UI-only embed: StemHint.
+                // Owner may already be in `used` (placed by its Data slot).
                 var owner = FindField(fields, slot);
                 if (owner is null)
                     continue;
@@ -91,7 +98,7 @@ internal static class TemplateSlotLayout
                 continue;
             }
 
-            var field = FindField(fields, slot);
+            var field = FindField(fields, slot, used);
             if (field is null)
                 continue;
 
@@ -303,6 +310,12 @@ internal static class TemplateSlotLayout
         return list;
     }
 
+    /// <summary>
+    /// Soft right edge for template geometry. Prevents FixPictOverlaps cascades from
+    /// shoving slots to X≈80000 (then Apply would emit invisible SF2 fields).
+    /// </summary>
+    public const int MaxTemplateContentX = 1200;
+
     /// <summary>If a Pict covers another Data/Text on the same row, shift that sibling (and those to its right).</summary>
     private static void FixPictOverlaps(List<TemplateSlot> list)
     {
@@ -317,6 +330,7 @@ internal static class TemplateSlotLayout
             var owner = list.FirstOrDefault(d =>
                 d.Kind == TemplateSlotKind.Data
                 && d.Suffix.Equals(pict.Suffix, StringComparison.OrdinalIgnoreCase)
+                && d.Group.Equals(pict.Group, StringComparison.OrdinalIgnoreCase)
                 && string.Equals(d.StemHint, pict.StemHint, StringComparison.OrdinalIgnoreCase)
             );
 
@@ -341,8 +355,22 @@ internal static class TemplateSlotLayout
                 if (hit is null)
                     break;
 
+                // Do not shove fields from other template groups (e.g. embedded TirId on same Y).
+                if (
+                    !hit.Group.Equals(pict.Group, StringComparison.OrdinalIgnoreCase)
+                    && (
+                        owner is null
+                        || !hit.Group.Equals(owner.Group, StringComparison.OrdinalIgnoreCase)
+                    )
+                )
+                    break;
+
                 int shift = pict.X + pict.Width + 4 - hit.X;
                 if (shift <= 0)
+                    break;
+
+                // Stop if the push would park content far past a normal form width.
+                if (hit.X + shift > MaxTemplateContentX)
                     break;
 
                 foreach (
@@ -351,6 +379,13 @@ internal static class TemplateSlotLayout
                         && !ReferenceEquals(s, owner)
                         && Math.Abs(s.Y - hit.Y) <= 2
                         && (ReferenceEquals(s, hit) || s.X >= pict.X)
+                        && (
+                            s.Group.Equals(pict.Group, StringComparison.OrdinalIgnoreCase)
+                            || (
+                                owner is not null
+                                && s.Group.Equals(owner.Group, StringComparison.OrdinalIgnoreCase)
+                            )
+                        )
                     )
                 )
                 {
@@ -428,20 +463,28 @@ internal static class TemplateSlotLayout
         return stemHint;
     }
 
-    public static Data? FindField(IReadOnlyList<Data> fields, TemplateSlot slot)
+    public static Data? FindField(
+        IReadOnlyList<Data> fields,
+        TemplateSlot slot,
+        ISet<string>? excludeNames = null
+    )
     {
         var candidates = fields
             .Where(f =>
                 LayoutUtil
                     .GetLastToken(f.FieldElement.ElementName)
                     .Equals(slot.Suffix, StringComparison.OrdinalIgnoreCase)
+                && (
+                    excludeNames is null
+                    || !excludeNames.Contains(f.FieldElement.ElementName)
+                )
             )
             .ToList();
 
         if (candidates.Count == 0)
             return null;
 
-        // Disambiguate shared suffixes (CountryCode) by template group.
+        // Disambiguate shared suffixes (CountryCode, OrganizationName) by template group.
         if (slot.Group.Equals(IdentityCardFieldGroupTemplate.TemplateName, StringComparison.OrdinalIgnoreCase))
         {
             candidates = candidates
@@ -451,12 +494,23 @@ internal static class TemplateSlotLayout
         else if (slot.Group.Equals(AddressFieldGroupTemplate.TemplateName, StringComparison.OrdinalIgnoreCase))
         {
             candidates = candidates
-                .Where(f => !IdentityCardFieldGroupTemplate.IsIdentityCardField(f.FieldElement.ElementName))
+                .Where(f =>
+                    !IdentityCardFieldGroupTemplate.IsIdentityCardField(f.FieldElement.ElementName)
+                    // UITN / similar CountryCode must not fill Address slots inside Organization.
+                    && !f.FieldElement.ElementName.Contains("UITN", StringComparison.OrdinalIgnoreCase)
+                )
                 .ToList();
         }
         else if (slot.Group.Equals(ContactFieldGroupTemplate.TemplateName, StringComparison.OrdinalIgnoreCase))
         {
             candidates = candidates.Where(ContactFieldGroupTemplate.IsContactField).ToList();
+        }
+        else if (slot.Group.Equals(OrganizationFieldGroupTemplate.TemplateName, StringComparison.OrdinalIgnoreCase))
+        {
+            // OrganizationName / CountryCode must not steal nested IdentityCard fields.
+            candidates = candidates
+                .Where(f => !IdentityCardFieldGroupTemplate.IsIdentityCardField(f.FieldElement.ElementName))
+                .ToList();
         }
 
         if (candidates.Count == 0)
@@ -480,6 +534,24 @@ internal static class TemplateSlotLayout
             );
             if (addr is not null)
                 return addr;
+        }
+
+        // Unknown / empty group: never prefer IdentityCard for shared suffixes.
+        if (string.IsNullOrEmpty(slot.Group)
+            || !slot.Group.Equals(IdentityCardFieldGroupTemplate.TemplateName, StringComparison.OrdinalIgnoreCase))
+        {
+            if (
+                slot.Suffix.Equals("OrganizationName", StringComparison.OrdinalIgnoreCase)
+                || slot.Suffix.Equals("CountryCode", StringComparison.OrdinalIgnoreCase)
+            )
+            {
+                var nonId = candidates.FirstOrDefault(f =>
+                    !IdentityCardFieldGroupTemplate.IsIdentityCardField(f.FieldElement.ElementName)
+                );
+                if (nonId is not null
+                    && !slot.Group.Equals(IdentityCardFieldGroupTemplate.TemplateName, StringComparison.OrdinalIgnoreCase))
+                    return nonId;
+            }
         }
 
         return candidates[0];

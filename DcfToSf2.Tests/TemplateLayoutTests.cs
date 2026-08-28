@@ -175,6 +175,7 @@ public class TemplateLayoutTests
     [Fact]
     public void Organization_NestsAddressAndIdentityCard()
     {
+        TemplateLayoutStore.ClearTemplate(OrganizationFieldGroupTemplate.TemplateName);
         var fields = new List<Data>
         {
             Field("Seller_OrganizationName", "C150 |ООО", "MAIN"),
@@ -191,8 +192,14 @@ public class TemplateLayoutTests
         var block = new Block { Name = "MAIN" };
         org.LayoutOrgFields(block, fields, 4, 4, 770, []);
 
-        var idCode = block.Fields.First(f => f.FieldValue.Name.Contains("IdentityCardCode"));
-        var country = block.Fields.First(f => f.FieldValue.Name.EndsWith("CountryCode") && !f.FieldValue.Name.Contains("IdentityCard"));
+        var idCode = block.Fields.First(f =>
+            f.FieldType == Type.Data && f.FieldValue.Name.Contains("IdentityCardCode")
+        );
+        var country = block.Fields.First(f =>
+            f.FieldType == Type.Data
+            && f.FieldValue.Name.EndsWith("CountryCode")
+            && !f.FieldValue.Name.Contains("IdentityCard")
+        );
         // Identity appears before address when listed first
         Assert.True(idCode.FieldPosition.Y <= country.FieldPosition.Y);
     }
@@ -810,6 +817,350 @@ public class TemplateLayoutTests
             "ConsignorDetails_IdentityCard_CountryCode",
             TemplateSlotLayout.FindField(fields, idSlot)!.FieldElement.ElementName
         );
+    }
+
+    [Fact]
+    public void FindField_OrganizationName_DoesNotStealIdentityCard()
+    {
+        var fields = new List<Data>
+        {
+            Field("ConsignorDetails_IdentityCard_OrganizationName", "C150 |выдавшей", "MAIN"),
+            Field("ConsignorDetails_OrganizationName", "C150 |орг", "MAIN"),
+        };
+
+        var orgSlot = new TemplateSlot
+        {
+            Id = "Data:Organization:OrganizationName",
+            Suffix = "OrganizationName",
+            Kind = TemplateSlotKind.Data,
+            X = 4,
+            Y = 4,
+            Width = 400,
+            Height = 16,
+            Group = OrganizationFieldGroupTemplate.TemplateName,
+        };
+        var idSlot = new TemplateSlot
+        {
+            Id = "Data:IdentityCard:OrganizationName",
+            Suffix = "OrganizationName",
+            Kind = TemplateSlotKind.Data,
+            X = 4,
+            Y = 40,
+            Width = 544,
+            Height = 16,
+            Group = IdentityCardFieldGroupTemplate.TemplateName,
+        };
+
+        Assert.Equal(
+            "ConsignorDetails_OrganizationName",
+            TemplateSlotLayout.FindField(fields, orgSlot)!.FieldElement.ElementName
+        );
+        Assert.Equal(
+            "ConsignorDetails_IdentityCard_OrganizationName",
+            TemplateSlotLayout.FindField(fields, idSlot)!.FieldElement.ElementName
+        );
+    }
+
+    [Fact]
+    public void Apply_DoesNotPlaceSameFieldTwice_WhenDuplicateCountryCodeSlots()
+    {
+        var fields = new List<Data>
+        {
+            Field("ConsignorDetails_IdentityCard_CountryCode", "C2 |код страны выдачи", "MAIN"),
+            Field("ConsignorDetails_IdentityCard_IdentityCardCode", "C20 |код", "MAIN"),
+        };
+
+        var slots = new List<TemplateSlot>
+        {
+            new()
+            {
+                Id = "Data:IdentityCard:CountryCode",
+                Suffix = "CountryCode",
+                Kind = TemplateSlotKind.Data,
+                X = 4,
+                Y = 4,
+                Width = 20,
+                Height = 16,
+                Group = IdentityCardFieldGroupTemplate.TemplateName,
+            },
+            new()
+            {
+                Id = "Data:IdentityCard:CountryCode:dup",
+                Suffix = "CountryCode",
+                Kind = TemplateSlotKind.Data,
+                X = 40,
+                Y = 40,
+                Width = 32,
+                Height = 16,
+                Group = IdentityCardFieldGroupTemplate.TemplateName,
+            },
+            new()
+            {
+                Id = "Data:Address:CountryCode",
+                Suffix = "CountryCode",
+                Kind = TemplateSlotKind.Data,
+                X = 80,
+                Y = 80,
+                Width = 32,
+                Height = 16,
+                Group = AddressFieldGroupTemplate.TemplateName,
+            },
+        };
+
+        var block = new Block { Name = "MAIN" };
+        TemplateSlotLayout.Apply(block, fields, slots, 4, 4, 770);
+
+        var country = block.Fields
+            .Where(f => f.FieldType == Type.Data && f.FieldValue.Name == "ConsignorDetails_IdentityCard_CountryCode")
+            .ToList();
+        Assert.Single(country);
+    }
+
+    [Fact]
+    public void Apply_SkipsOffScreenSlots_AndPlacesFieldInRest()
+    {
+        var fields = new List<Data>
+        {
+            Field("ConsignorDetails_IdentityCard_IssuerCode", "C7 |код подр", "MAIN"),
+            Field("ConsignorDetails_ShortName", "C120 |краткое", "MAIN"),
+        };
+
+        var slots = new List<TemplateSlot>
+        {
+            new()
+            {
+                Id = "Data:Organization:ShortName",
+                Suffix = "ShortName",
+                Kind = TemplateSlotKind.Data,
+                X = 4,
+                Y = 4,
+                Width = 240,
+                Height = 16,
+                Group = OrganizationFieldGroupTemplate.TemplateName,
+            },
+            new()
+            {
+                Id = "Data:IdentityCard:IssuerCode",
+                Suffix = "IssuerCode",
+                Kind = TemplateSlotKind.Data,
+                X = 81032,
+                Y = 112,
+                Width = 60,
+                Height = 16,
+                Group = IdentityCardFieldGroupTemplate.TemplateName,
+            },
+            new()
+            {
+                Id = "Pict:IdentityCard:IssuerCode",
+                Suffix = "IssuerCode",
+                Kind = TemplateSlotKind.Pict,
+                X = 81004,
+                Y = 112,
+                Width = 12,
+                Height = 12,
+                Group = IdentityCardFieldGroupTemplate.TemplateName,
+            },
+        };
+
+        var block = new Block { Name = "MAIN" };
+        TemplateSlotLayout.Apply(block, fields, slots, 4, 4, 770);
+
+        var issuer = Assert.Single(
+            block.Fields,
+            f => f.FieldType == Type.Data && f.FieldValue.Name == "ConsignorDetails_IdentityCard_IssuerCode"
+        );
+        Assert.True(issuer.FieldPosition.X < 800, $"IssuerCode X={issuer.FieldPosition.X} should be on-canvas");
+        Assert.DoesNotContain(
+            block.Fields,
+            f => f.FieldType == Type.Pict && f.FieldPosition.X >= 800
+        );
+    }
+
+    [Fact]
+    public void EnsurePictSlots_MatchesOwnerByGroup_DoesNotExplodeX()
+    {
+        var slots = new List<TemplateSlot>
+        {
+            new()
+            {
+                Id = "Data:IdentityCard:CountryCode",
+                Suffix = "CountryCode",
+                Kind = TemplateSlotKind.Data,
+                X = 600,
+                Y = 40,
+                Width = 20,
+                Height = 16,
+                Group = IdentityCardFieldGroupTemplate.TemplateName,
+            },
+            new()
+            {
+                Id = "Data:Address:CountryCode",
+                Suffix = "CountryCode",
+                Kind = TemplateSlotKind.Data,
+                X = 4,
+                Y = 40,
+                Width = 32,
+                Height = 16,
+                Group = AddressFieldGroupTemplate.TemplateName,
+            },
+            new()
+            {
+                Id = "Data:IdentityCard:IssuerCode",
+                Suffix = "IssuerCode",
+                Kind = TemplateSlotKind.Data,
+                X = 650,
+                Y = 40,
+                Width = 60,
+                Height = 16,
+                Group = IdentityCardFieldGroupTemplate.TemplateName,
+            },
+            // Address CountryCode pict wrongly sitting on IdentityCard row — must bind to Address data.
+            new()
+            {
+                Id = "Pict:Address:CountryCode",
+                Suffix = "CountryCode",
+                Kind = TemplateSlotKind.Pict,
+                X = 40,
+                Y = 42,
+                Width = 12,
+                Height = 12,
+                Group = AddressFieldGroupTemplate.TemplateName,
+            },
+        };
+
+        var fixedSlots = TemplateSlotLayout.EnsurePictSlots(slots);
+        Assert.True(
+            fixedSlots.Max(s => s.X) < TemplateSlotLayout.MaxTemplateContentX,
+            $"max X={fixedSlots.Max(s => s.X)} exploded past template edge"
+        );
+    }
+
+    [Fact]
+    public void OrganizationSanitize_RestoresOrgName_AndMovesIdentityCardOutOfHeader()
+    {
+        TemplateLayoutStore.ClearTemplate(OrganizationFieldGroupTemplate.TemplateName);
+        // Corrupted replaceBase: IdentityCard OrganizationName+CountryCode on the header row, no org name.
+        var broken = new List<TemplateSlot>
+        {
+            new()
+            {
+                Id = "Data:IdentityCard:OrganizationName",
+                Suffix = "OrganizationName",
+                Kind = TemplateSlotKind.Data,
+                X = 4,
+                Y = 0,
+                Width = 640,
+                Height = 16,
+                Group = IdentityCardFieldGroupTemplate.TemplateName,
+                IsEmbedded = true,
+            },
+            new()
+            {
+                Id = "Data:IdentityCard:CountryCode",
+                Suffix = "CountryCode",
+                Kind = TemplateSlotKind.Data,
+                X = 648,
+                Y = 0,
+                Width = 32,
+                Height = 16,
+                Group = IdentityCardFieldGroupTemplate.TemplateName,
+                IsEmbedded = true,
+            },
+            new()
+            {
+                Id = "Data:Organization:ShortName",
+                Suffix = "ShortName",
+                Kind = TemplateSlotKind.Data,
+                X = 4,
+                Y = 20,
+                Width = 240,
+                Height = 16,
+                Group = OrganizationFieldGroupTemplate.TemplateName,
+                IsEmbedded = true,
+            },
+        };
+        TemplateLayoutStore.SaveTemplate(OrganizationFieldGroupTemplate.TemplateName, broken, replaceBase: true);
+
+        try
+        {
+            var fields = new List<Data>
+            {
+                Field("ConsignorDetails_IdentityCard_CountryCode", "C2 |код", "MAIN"),
+                Field("ConsignorDetails_IdentityCard_OrganizationName", "C150 |выдавшей", "MAIN"),
+                Field("ConsignorDetails_IdentityCard_IdentityCardCode", "C20 |код", "MAIN"),
+                Field("ConsignorDetails_OrganizationName", "C150 |орг", "MAIN"),
+                Field("ConsignorDetails_ShortName", "C120 |краткое", "MAIN"),
+            };
+
+            var org = new OrganizationFieldGroupTemplate();
+            var block = new Block { Name = "MAIN" };
+            org.LayoutOrgFields(block, fields, 4, 4, 770, []);
+
+            var orgName = block.Fields.First(f =>
+                f.FieldType == Type.Data && f.FieldValue.Name == "ConsignorDetails_OrganizationName"
+            );
+            var idName = block.Fields.First(f =>
+                f.FieldType == Type.Data && f.FieldValue.Name == "ConsignorDetails_IdentityCard_OrganizationName"
+            );
+            var shortName = block.Fields.First(f =>
+                f.FieldType == Type.Data && f.FieldValue.Name == "ConsignorDetails_ShortName"
+            );
+
+            Assert.True(orgName.FieldPosition.Y < shortName.FieldPosition.Y, "org name must be above ShortName");
+            Assert.True(orgName.FieldPosition.Y < idName.FieldPosition.Y, "org name must be above IdentityCard name");
+            Assert.True(shortName.FieldPosition.Y < idName.FieldPosition.Y, "IdentityCard must be below org header");
+        }
+        finally
+        {
+            TemplateLayoutStore.ClearTemplate(OrganizationFieldGroupTemplate.TemplateName);
+        }
+    }
+
+    [Fact]
+    public void OrganizationTemplate_IdentityCardFieldsAppearOnce()
+    {
+        TemplateLayoutStore.ClearTemplate(OrganizationFieldGroupTemplate.TemplateName);
+        // Force slot-Apply path (same as saved Organization layout).
+        var org = new OrganizationFieldGroupTemplate();
+        TemplateLayoutStore.SaveTemplate(
+            OrganizationFieldGroupTemplate.TemplateName,
+            org.GetDefaultPreviewSlots([]).Select(s => s.Clone()).ToList()
+        );
+
+        try
+        {
+            var fields = new List<Data>
+            {
+                Field("ConsignorDetails_IdentityCard_CountryCode", "C2 |Кодовое обозначение страны", "MAIN"),
+                Field("ConsignorDetails_IdentityCard_OrganizationName", "C150 |выдавшей", "MAIN"),
+                Field("ConsignorDetails_IdentityCard_IdentityCardCode", "C20 |код", "MAIN"),
+                Field("ConsignorDetails_IdentityCard_IdentityCardName", "C40 |имя", "MAIN"),
+                Field("ConsignorDetails_IdentityCard_IssuerCode", "C7 |код подр", "MAIN"),
+                Field("ConsignorDetails_OrganizationName", "C150 |орг", "MAIN"),
+                Field("ConsignorDetails_ShortName", "C120 |краткое", "MAIN"),
+                Field("ConsignorDetails_UITN_CountryCode", "C2 |UITN страна", "MAIN"),
+            };
+
+            var block = new Block { Name = "MAIN" };
+            org.LayoutOrgFields(block, fields, 4, 4, 770, []);
+
+            static int CountData(Block b, string name) =>
+                b.Fields.Count(f => f.FieldType == Type.Data && f.FieldValue.Name == name);
+
+            Assert.Equal(1, CountData(block, "ConsignorDetails_IdentityCard_CountryCode"));
+            Assert.Equal(1, CountData(block, "ConsignorDetails_IdentityCard_OrganizationName"));
+            Assert.Equal(1, CountData(block, "ConsignorDetails_IdentityCard_IssuerCode"));
+            Assert.Equal(1, CountData(block, "ConsignorDetails_OrganizationName"));
+
+            var orgName = block.Fields.First(f =>
+                f.FieldType == Type.Data && f.FieldValue.Name == "ConsignorDetails_OrganizationName"
+            );
+            Assert.True(orgName.FieldPosition.X < 100, "org OrganizationName should use Organization slot, not IdentityCard");
+        }
+        finally
+        {
+            TemplateLayoutStore.ClearTemplate(OrganizationFieldGroupTemplate.TemplateName);
+        }
     }
 
     [Fact]

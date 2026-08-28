@@ -260,18 +260,21 @@ internal sealed class OrganizationFieldGroupTemplate : IFieldGroupTemplate
         foreach (var s in idSlots)
         {
             var c = s.Clone();
-            c.Y = y + s.Y;
+            c.Y = y + (s.Y - TemplateSlotLayout.OriginY);
             slots.Add(c);
         }
 
-        int idH = idSlots.Count > 0 ? idSlots.Max(s => s.Y + s.Height) : 0;
+        int idH =
+            idSlots.Count > 0
+                ? idSlots.Max(s => s.Y + s.Height) - TemplateSlotLayout.OriginY
+                : 0;
         y += idH + 8;
 
         var addrSlots = _address.GetDefaultPreviewSlots(ignoreFields);
         foreach (var s in addrSlots)
         {
             var c = s.Clone();
-            c.Y = y + s.Y;
+            c.Y = y + (s.Y - TemplateSlotLayout.OriginY);
             slots.Add(c);
         }
 
@@ -279,7 +282,145 @@ internal sealed class OrganizationFieldGroupTemplate : IFieldGroupTemplate
     }
 
     public IReadOnlyList<TemplateSlot> GetPreviewSlots(HashSet<string> ignoreFields) =>
-        TemplateLayoutStore.ApplyOverrides(Name, GetDefaultPreviewSlots(ignoreFields));
+        SanitizePreviewSlots(
+            TemplateLayoutStore.ApplyOverrides(Name, GetDefaultPreviewSlots(ignoreFields)),
+            ignoreFields
+        );
+
+    /// <summary>
+    /// Repair broken saved Organization layouts: missing org OrganizationName, and IdentityCard
+    /// fields parked on the org header row (above ShortName / requisites).
+    /// </summary>
+    internal static IReadOnlyList<TemplateSlot> SanitizePreviewSlots(
+        IReadOnlyList<TemplateSlot> slots,
+        HashSet<string> ignoreFields
+    )
+    {
+        var list = slots.Select(s => s.Clone()).ToList();
+
+        bool hasOrgName = list.Any(s =>
+            s.Kind == TemplateSlotKind.Data
+            && !s.IsExcluded
+            && s.Suffix.Equals("OrganizationName", StringComparison.OrdinalIgnoreCase)
+            && s.Group.Equals(TemplateName, StringComparison.OrdinalIgnoreCase)
+        );
+
+        if (!hasOrgName)
+        {
+            const int band = Consts.DefaultHeightData + 8;
+            foreach (var s in list)
+                s.Y += band;
+
+            list.Insert(
+                0,
+                new TemplateSlot
+                {
+                    Id = TemplateSlot.MakeId(TemplateSlotKind.Data, TemplateName, "OrganizationName"),
+                    Suffix = "OrganizationName",
+                    Label = "OrganizationName",
+                    Comment = LayoutUtil.DefaultFieldComment("OrganizationName", TemplateName),
+                    Kind = TemplateSlotKind.Data,
+                    X = TemplateSlotLayout.OriginX,
+                    Y = TemplateSlotLayout.OriginY,
+                    Width = 400,
+                    Height = Consts.DefaultHeightData,
+                    IsIgnored = IsIgnored("OrganizationName", ignoreFields),
+                    Group = TemplateName,
+                }
+            );
+        }
+
+        int shortNameY = list
+            .Where(s =>
+                s.Kind == TemplateSlotKind.Data
+                && !s.IsExcluded
+                && s.Suffix.Equals("ShortName", StringComparison.OrdinalIgnoreCase)
+            )
+            .Select(s => s.Y)
+            .DefaultIfEmpty(-1)
+            .Min();
+
+        int orgNameY = list
+            .Where(s =>
+                s.Kind == TemplateSlotKind.Data
+                && !s.IsExcluded
+                && s.Suffix.Equals("OrganizationName", StringComparison.OrdinalIgnoreCase)
+                && s.Group.Equals(TemplateName, StringComparison.OrdinalIgnoreCase)
+            )
+            .Select(s => s.Y)
+            .DefaultIfEmpty(TemplateSlotLayout.OriginY)
+            .Min();
+
+        // IdentityCard parked on/above the ShortName (or org-name) row — not below the header.
+        int headerRowY = shortNameY >= 0 ? shortNameY : orgNameY + Consts.DefaultHeightData + 4;
+        bool identityInHeader = list.Any(s =>
+            s.Kind == TemplateSlotKind.Data
+            && !s.IsExcluded
+            && s.Group.Equals(IdentityCardFieldGroupTemplate.TemplateName, StringComparison.OrdinalIgnoreCase)
+            && s.Y <= headerRowY + 2
+        );
+
+        if (!identityInHeader)
+            return list;
+
+        list.RemoveAll(s =>
+            s.Group.Equals(IdentityCardFieldGroupTemplate.TemplateName, StringComparison.OrdinalIgnoreCase)
+        );
+
+        int HeaderBottom()
+        {
+            int bottom = TemplateSlotLayout.OriginY + Consts.DefaultHeightData;
+            foreach (var s in list.Where(s => s.Kind == TemplateSlotKind.Data && !s.IsExcluded))
+            {
+                bool header =
+                    s.Group.Equals(TemplateName, StringComparison.OrdinalIgnoreCase)
+                    || s.Group.Equals("RFOrganizationFeatures", StringComparison.OrdinalIgnoreCase)
+                    || s.Group.Equals(ContactFieldGroupTemplate.TemplateName, StringComparison.OrdinalIgnoreCase)
+                    || s.Suffix.Equals("ShortName", StringComparison.OrdinalIgnoreCase)
+                    || s.Suffix is "OGRN" or "INN" or "KPP" or "OKPOID" or "OKATOCode";
+                if (header)
+                    bottom = Math.Max(bottom, s.Y + s.Height);
+            }
+
+            return bottom;
+        }
+
+        int headerBottom = HeaderBottom();
+        int destY = headerBottom + 8;
+        var idDefaults = new IdentityCardFieldGroupTemplate().GetDefaultPreviewSlots(ignoreFields);
+        foreach (var s in idDefaults)
+        {
+            var c = s.Clone();
+            c.Y = destY + (s.Y - TemplateSlotLayout.OriginY);
+            list.Add(c);
+        }
+
+        // Keep Address / other groups below the restored IdentityCard band.
+        int idBottom =
+            idDefaults.Count > 0
+                ? destY + (idDefaults.Max(s => s.Y + s.Height) - TemplateSlotLayout.OriginY)
+                : destY;
+        int addrMinY = list
+            .Where(s =>
+                s.Group.Equals(AddressFieldGroupTemplate.TemplateName, StringComparison.OrdinalIgnoreCase)
+                && !s.IsExcluded
+            )
+            .Select(s => s.Y)
+            .DefaultIfEmpty(int.MaxValue)
+            .Min();
+        if (addrMinY < int.MaxValue && addrMinY < idBottom + 4)
+        {
+            int shift = idBottom + 8 - addrMinY;
+            foreach (
+                var s in list.Where(s =>
+                    s.Group.Equals(AddressFieldGroupTemplate.TemplateName, StringComparison.OrdinalIgnoreCase)
+                )
+            )
+                s.Y += shift;
+        }
+
+        return list;
+    }
 
     private static bool IsIgnored(string suffix, HashSet<string> ignoreFields) =>
         ignoreFields.Contains(suffix)
