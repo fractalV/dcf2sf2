@@ -2,15 +2,12 @@ using DcfToSf2.Parsing;
 
 namespace DcfToSf2.Layout.Templates;
 
-/// <summary>Persisted definition of a user-created field-group template.</summary>
 internal sealed class UserTemplateDefinitionDto
 {
     public string Name { get; set; } = string.Empty;
 
-    /// <summary>DCF block path this template was created from (e.g. Goods\Container).</summary>
     public string? MatchPath { get; set; }
 
-    /// <summary>Also match the same suffix cluster in other blocks.</summary>
     public bool MatchBySuffixes { get; set; } = true;
 
     public List<UserTemplateFieldDto> Fields { get; set; } = [];
@@ -24,7 +21,6 @@ internal sealed class UserTemplateFieldDto
     public int Height { get; set; } = Consts.DefaultHeightData;
 }
 
-/// <summary>Runtime template built from a user definition (created from a document tree branch).</summary>
 internal sealed class UserDefinedFieldGroupTemplate : IFieldGroupTemplate
 {
     private readonly UserTemplateDefinitionDto _def;

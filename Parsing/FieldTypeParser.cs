@@ -4,7 +4,6 @@ namespace DcfToSf2.Parsing;
 
 internal static class FieldTypeParser
 {
-    // C50, N11.4, D10, B, L1, S1, 75x2, 90,90,70 250, C250 24
     private static readonly Regex TypeTokenRegex = new(
         @"^(?<tok>(?:[CBNDLS]\d+(?:\.\d+)?)|(?:\d+x\d+)|(?:\d+(?:,\d+)+)|B)\b",
         RegexOptions.Compiled | RegexOptions.IgnoreCase
@@ -18,7 +17,6 @@ internal static class FieldTypeParser
             return new ParsedFieldType { IsValid = true, RawToken = string.Empty, Kind = '\0' };
         }
 
-        // Block type: "B |"
         if (trimmed.StartsWith("B ", StringComparison.OrdinalIgnoreCase) || trimmed.Equals("B", StringComparison.OrdinalIgnoreCase)
             || trimmed.StartsWith("B|", StringComparison.OrdinalIgnoreCase))
         {
@@ -35,7 +33,6 @@ internal static class FieldTypeParser
         var match = TypeTokenRegex.Match(trimmed);
         if (!match.Success)
         {
-            // allow multi-size tokens like "90,90,70 250"
             int pipe = trimmed.IndexOf('|');
             string beforePipe = pipe >= 0 ? trimmed[..pipe].Trim() : trimmed;
             string first = beforePipe.Split(' ', StringSplitOptions.RemoveEmptyEntries).FirstOrDefault() ?? string.Empty;
@@ -60,7 +57,7 @@ internal static class FieldTypeParser
             length = parsedLen;
 
         int rows = 1;
-        // "75x2" already handled; "C250 24" second number is display width hint
+
         return new ParsedFieldType
         {
             IsValid = true,

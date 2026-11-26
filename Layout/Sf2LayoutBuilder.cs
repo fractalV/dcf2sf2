@@ -48,11 +48,9 @@ internal static class Sf2LayoutBuilder
 
         var doc = new Sf2Document { DocumentName = header.DocumentName, ShortTitle = title };
 
-        // Group fields by SF2 block path derived only from DCF nesting
         var blockGroups = GroupByBlockPath(parsed.Fields, options.IgnoreFields);
         string? mainBlockName = ResolveMainBlock(header, parsed.Fields);
 
-        // Build each block
         var built = new Dictionary<string, Block>(StringComparer.OrdinalIgnoreCase);
 
         foreach (var (path, fields) in blockGroups)
@@ -64,7 +62,6 @@ internal static class Sf2LayoutBuilder
                     f.FieldElement.ElementValue.Contains("&&Num", StringComparison.OrdinalIgnoreCase)
                 );
 
-            // Filter: for repeating block open markers (empty value), treat as section header only
             var dataFields = fields
                 .Where(f =>
                     !string.IsNullOrEmpty(f.FieldElement.ElementValue)
@@ -85,7 +82,6 @@ internal static class Sf2LayoutBuilder
             built[path] = block;
         }
 
-        // Order: MainBlock first (if any), then MAIN, then others
         if (
             mainBlockName is not null
             && built.TryGetValue(mainBlockName, out var mb)
@@ -95,7 +91,6 @@ internal static class Sf2LayoutBuilder
             built.Remove(mainBlockName);
         }
 
-        // Also match path that equals main block leaf
         var mainKey = built.Keys.FirstOrDefault(k =>
             k.Equals(mainBlockName, StringComparison.OrdinalIgnoreCase)
             || k.EndsWith("\\" + mainBlockName, StringComparison.OrdinalIgnoreCase)
@@ -124,7 +119,6 @@ internal static class Sf2LayoutBuilder
         if (!string.IsNullOrWhiteSpace(header.MainBlock))
             return header.MainBlock.Trim();
 
-        // First repeating block open from DCF
         var open = fields.FirstOrDefault(f =>
             string.IsNullOrEmpty(f.FieldElement.ElementValue)
             && !string.IsNullOrEmpty(f.FieldElement.ElementName)
@@ -148,7 +142,6 @@ internal static class Sf2LayoutBuilder
         {
             if (IsBlockOpenMarker(field))
             {
-                // Hyperlink lives on parent; content section is the block path itself
                 string parent =
                     field.Level <= 1
                         ? Consts.DefaultBlockName
@@ -219,7 +212,6 @@ internal static class Sf2LayoutBuilder
         var block = new Block { Name = Consts.DefaultBlockName, Title = string.Empty };
         int y = Consts.Default_Y;
 
-        // Title
         if (!string.IsNullOrEmpty(title))
         {
             block.Fields.Add(
@@ -227,7 +219,6 @@ internal static class Sf2LayoutBuilder
             );
         }
 
-        // Root B-block titles: Applicant=B |* 2. Сведения о заявителе
         var sectionTitles = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         foreach (var f in fields.Where(IsBlockType))
         {
@@ -273,7 +264,6 @@ internal static class Sf2LayoutBuilder
             }
         }
 
-        // Loose root fields (no B-block parent)
         y = LayoutGenericFields(block, other, Consts.Default_X, y, Consts.DefaultWidthBlock - 8, options, Consts.DefaultBlockName);
 
         var remaining = sectionBuckets.Keys.ToHashSet(StringComparer.OrdinalIgnoreCase);
@@ -381,8 +371,6 @@ internal static class Sf2LayoutBuilder
         int contentWidth = Consts.DefaultWidthBlock - 16;
         int contentX = Consts.Default_X + 4;
 
-        // Probe without comments: one data row → title Text only, no Rect.
-        // (Comments can become Text labels in some layouts and skew the single-row check.)
         var probe = new Block { Name = "_probe" };
         LayoutSectionContent(
             probe,
@@ -506,7 +494,6 @@ internal static class Sf2LayoutBuilder
         if (h < 12 || w < 16)
             return;
 
-        // Rect caption is plain text (no `), as in Alta samples.
         block.Fields.Add(
             new Field(Type.Rect, new Size(w, h), new Position(x, y), new Value(title.Trim(), string.Empty))
         );
@@ -532,7 +519,7 @@ internal static class Sf2LayoutBuilder
         };
 
         var content = fields.Where(f => !IsBlockOpenMarker(f) || f.FieldElement.ElementName != leaf).ToList();
-        // nested hyperlinks inside
+
         int y = Consts.Default_Y;
         y = LayoutGenericFields(
             block,
@@ -615,13 +602,8 @@ internal static class Sf2LayoutBuilder
         return startY + height;
     }
 
-    /// <summary>
-    /// Space under the Rect top edge so fields do not cover the frame caption.
-    /// Long titles wrap; estimate line count from caption width.
-    /// </summary>
     private static int RectCaptionTopPad(string title, int rectWidth)
     {
-        // Extra air under the Rect top/caption so first Data row is not tight to the frame.
         const int extraBelowCaption = 16;
         string t = (title ?? string.Empty).Trim();
         if (t.Length == 0)
@@ -656,7 +638,6 @@ internal static class Sf2LayoutBuilder
             remaining.Add(f);
         }
 
-        // Loading | Unloading on one row if both present
         var loading = remaining
             .Where(f => f.FieldElement.ElementName.StartsWith("Loading_", StringComparison.OrdinalIgnoreCase))
             .ToList();
@@ -688,11 +669,9 @@ internal static class Sf2LayoutBuilder
             y += Consts.DefaultHeightData + 20;
         }
 
-        // Document triad PrDocumentName/Number/Date
         y = LayoutDocumentTriad(block, remaining, baseX, y, maxWidth, out var usedDoc, suppressFieldComments);
         remaining = remaining.Where(f => !usedDoc.Contains(f.FieldElement.ElementName)).ToList();
 
-        // Signature person row
         y = LayoutSignature(block, remaining, baseX, y, maxWidth, out var usedSig);
         remaining = remaining.Where(f => !usedSig.Contains(f.FieldElement.ElementName)).ToList();
 
@@ -791,7 +770,6 @@ internal static class Sf2LayoutBuilder
         if (found.Count < 2)
             return y;
 
-        // Group by prefix before last person token
         var groups = found.GroupBy(f =>
         {
             string n = f.FieldElement.ElementName;
@@ -849,7 +827,7 @@ internal static class Sf2LayoutBuilder
     private static Field DataField(Data data, int x, int y, int w, int h, string? labelOverride = null)
     {
         string comment = labelOverride ?? string.Empty;
-        // when labelOverride is null, keep empty (label already as Text); when provided use it
+
         if (labelOverride is null)
             comment = string.Empty;
         return new Field(
@@ -883,7 +861,7 @@ internal static class Sf2LayoutBuilder
         if (!t.IsValid || t.IsBlock)
             return fallback;
         int w = FieldTypeParser.DisplayWidth(t);
-        // multi-row text widths in dcf often huge — cap
+
         return Math.Min(w, fallback > 0 ? Math.Max(fallback, 80) : Consts.DefaultWidthBlock);
     }
 
@@ -892,7 +870,7 @@ internal static class Sf2LayoutBuilder
         var t = FieldTypeParser.Parse(f.FieldElement.ElementValue);
         bool seq = f.FieldElement.ElementValue.Contains("SEQ=", StringComparison.OrdinalIgnoreCase);
         int rows = Math.Max(t.Rows, seq ? 2 : 1);
-        // sizes like 75x2 mean 2 rows of data height
+
         if (t.Kind == 'M' && t.Rows > 1)
             return Consts.DefaultHeightData * t.Rows;
         return Consts.DefaultHeightData * Math.Max(1, rows);
@@ -924,10 +902,6 @@ internal static class Sf2LayoutBuilder
         return comment.Trim();
     }
 
-    /// <summary>
-    /// Stem of an organization field group, e.g. Seller, ConsignorDetails.
-    /// Matches classic Seller_* and compound ConsignorDetails_RFOrganizationFeatures_INN.
-    /// </summary>
     private static string? GetOrgStem(string fieldName)
     {
         if (string.IsNullOrEmpty(fieldName))

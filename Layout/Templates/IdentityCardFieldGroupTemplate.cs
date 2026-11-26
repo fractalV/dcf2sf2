@@ -40,11 +40,9 @@ internal sealed class IdentityCardFieldGroupTemplate : IFieldGroupTemplate
             return null;
 
         string last = LayoutUtil.GetLastToken(name);
-        // Accept any field under IdentityCard stem; prefer known suffixes
         var clustered = new List<Data>();
         string stem = LayoutUtil.GetStem(name);
 
-        // Normalize stem to ...IdentityCard
         int idIdx = name.IndexOf(StemToken, StringComparison.OrdinalIgnoreCase);
         string idStem =
             idIdx >= 0
@@ -73,13 +71,11 @@ internal sealed class IdentityCardFieldGroupTemplate : IFieldGroupTemplate
                 return null;
             }
 
-            // Stop if we hit a different IdentityCard group
             string fStem = LayoutUtil.GetStem(f.FieldElement.ElementName);
             if (!f.FieldElement.ElementName.StartsWith(idStem + "_", StringComparison.OrdinalIgnoreCase)
                 && !f.FieldElement.ElementName.Equals(idStem, StringComparison.OrdinalIgnoreCase)
                 && !fStem.Equals(idStem, StringComparison.OrdinalIgnoreCase))
             {
-                // still under same IdentityCard if name contains idStem_
                 if (!f.FieldElement.ElementName.StartsWith(idStem, StringComparison.OrdinalIgnoreCase))
                 {
                     if (clustered.Count > 0)

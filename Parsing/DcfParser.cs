@@ -71,10 +71,6 @@ internal static class DcfParser
         return GetUserIgnoreMatch(elementName, ignoreFields) is not null;
     }
 
-    /// <summary>
-    /// Returns the ignore-list entry that matched the field, or null if not ignored by user rules.
-    /// Built-in service fields are not reported here.
-    /// </summary>
     public static string? GetUserIgnoreMatch(string elementName, IEnumerable<string> ignoreFields)
     {
         string last = GetLastToken(elementName);
@@ -96,10 +92,6 @@ internal static class DcfParser
         return null;
     }
 
-    /// <summary>
-    /// Wildcard (* ?) or /regex/ pattern used in --ignore-fields / UI.
-    /// Example: *Fax matches Carrier_Fax, Seller_Fax.
-    /// </summary>
     public static bool IsIgnorePattern(string entry)
     {
         if (string.IsNullOrWhiteSpace(entry))
@@ -132,7 +124,6 @@ internal static class DcfParser
         if (pattern.Length >= 2 && pattern[0] == '/' && pattern[^1] == '/')
             return pattern[1..^1];
 
-        // Glob: * → .*, ? → .
         var sb = new StringBuilder("^");
         foreach (char c in pattern)
         {
@@ -230,13 +221,12 @@ internal static class DcfParser
             return [];
         }
 
-        // verify opening bracket exists before .Fields]
         int bracket = text.LastIndexOf('[', idx);
         if (bracket < 0)
             diagnostics.Error(DiagnosticCategory.Structure, "malformed Fields section header");
 
         string body = text[(idx + marker.Length)..];
-        // Normalize newlines
+
         var lines = body.Replace("\r\n", "\n").Replace('\r', '\n').Split('\n');
 
         List<Data> elements = [];
@@ -252,7 +242,6 @@ internal static class DcfParser
             if (string.IsNullOrWhiteSpace(item))
                 continue;
 
-            // Strip PATTERN=/NAMESPACE= for layout, but validate quotes first on original
             string original = item;
             ValidateAttributes(original, diagnostics, lineNo);
 
@@ -270,7 +259,6 @@ internal static class DcfParser
                 string name = item[..eq].Trim();
                 string value = item[(eq + 1)..].Trim();
 
-                // Detect block open on same line: Name{&&Num ...
                 if (name.Contains('{'))
                 {
                     ParseBlockOpen(name, value, ref level, stack, elements, rusName, diagnostics, lineNo);
@@ -397,7 +385,7 @@ internal static class DcfParser
     {
         if (stack.Count == 0)
             return Consts.DefaultBlockName;
-        // Top-level repeating blocks use their own name as SF2 section (Goods, InvoiceGoods)
+
         return string.Join("\\", stack.Reverse());
     }
 

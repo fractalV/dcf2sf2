@@ -365,4 +365,9 @@ public partial class MainWindow : Window
         LogBox.Document.Blocks.Add(paragraph);
         LogBox.ScrollToEnd();
     }
+
+    private void TwoColumnBox_Checked(object sender, RoutedEventArgs e)
+    {
+
+    }
 }

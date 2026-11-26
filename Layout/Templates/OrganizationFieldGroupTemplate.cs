@@ -16,7 +16,6 @@ internal sealed class OrganizationFieldGroupTemplate : IFieldGroupTemplate
 
     public FieldGroupMatch? TryMatch(IReadOnlyList<Data> fields, int startIndex, HashSet<string> ignoreFields)
     {
-        // Organization is applied from org buckets, not generic scan.
         return null;
     }
 
@@ -132,7 +131,6 @@ internal sealed class OrganizationFieldGroupTemplate : IFieldGroupTemplate
                 used.Add(c.FieldElement.ElementName);
         }
 
-        // Nested IdentityCard / Address by first appearance order
         var idFields = visible
             .Where(f =>
                 IdentityCardFieldGroupTemplate.IsIdentityCardField(f.FieldElement.ElementName)
@@ -287,10 +285,6 @@ internal sealed class OrganizationFieldGroupTemplate : IFieldGroupTemplate
             ignoreFields
         );
 
-    /// <summary>
-    /// Repair broken saved Organization layouts: missing org OrganizationName, and IdentityCard
-    /// fields parked on the org header row (above ShortName / requisites).
-    /// </summary>
     internal static IReadOnlyList<TemplateSlot> SanitizePreviewSlots(
         IReadOnlyList<TemplateSlot> slots,
         HashSet<string> ignoreFields
@@ -351,7 +345,6 @@ internal sealed class OrganizationFieldGroupTemplate : IFieldGroupTemplate
             .DefaultIfEmpty(TemplateSlotLayout.OriginY)
             .Min();
 
-        // IdentityCard parked on/above the ShortName (or org-name) row — not below the header.
         int headerRowY = shortNameY >= 0 ? shortNameY : orgNameY + Consts.DefaultHeightData + 4;
         bool identityInHeader = list.Any(s =>
             s.Kind == TemplateSlotKind.Data
@@ -395,7 +388,6 @@ internal sealed class OrganizationFieldGroupTemplate : IFieldGroupTemplate
             list.Add(c);
         }
 
-        // Keep Address / other groups below the restored IdentityCard band.
         int idBottom =
             idDefaults.Count > 0
                 ? destY + (idDefaults.Max(s => s.Y + s.Height) - TemplateSlotLayout.OriginY)

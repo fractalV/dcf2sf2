@@ -3,7 +3,6 @@ using DcfToSf2.Parsing;
 
 namespace DcfToSf2.Ui;
 
-/// <summary>Builds nested ignore-field tree: path segments + B-block sections (NAMESPACE).</summary>
 internal static class IgnoreFieldsTreeBuilder
 {
     public static List<IgnoreBlockNode> Build(DcfParseResult parsed, HashSet<string> manualChecked)
@@ -37,7 +36,6 @@ internal static class IgnoreFieldsTreeBuilder
             leafNodes[path] = BuildPathNode(path, title, fields, manualChecked);
         }
 
-        // Ensure intermediate path segments exist so MAIN\A\B nests under MAIN\A under MAIN.
         foreach (var path in leafNodes.Keys.ToList())
         {
             string current = path;
@@ -127,7 +125,6 @@ internal static class IgnoreFieldsTreeBuilder
             sections[key] = section;
             sectionKeys.Add(key);
 
-            // NAMESPACE="GTDID" on B-field is an alias for matching child fields.
             string? ns = ExtractNamespace(header.FieldElement.ElementValue);
             if (
                 !string.IsNullOrWhiteSpace(ns)
@@ -159,7 +156,7 @@ internal static class IgnoreFieldsTreeBuilder
             }
         }
 
-        // Preserve document order of unique section nodes.
+
         var childSections = new List<IgnoreBlockNode>();
         var seen = new HashSet<IgnoreBlockNode>();
         foreach (var key in sectionKeys)
@@ -167,7 +164,7 @@ internal static class IgnoreFieldsTreeBuilder
             var section = sections[key];
             if (!seen.Add(section))
                 continue;
-            // Keep empty sections visible (B header alone) so NAMESPACE groups show up.
+
             childSections.Add(section);
         }
 

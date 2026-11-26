@@ -4,7 +4,7 @@ using System.Text.RegularExpressions;
 
 namespace DcfToSf2.Layout.Templates;
 
-/// <summary>SF2-like text preview/edit for template slots (Data/Text/Pict editable).</summary>
+/// <summary>Ппредварительный просмотр/редактирование текста для позиций шаблона (редактируемые данные/текст/изображение).</summary>
 internal static class TemplatePreviewText
 {
     public const string RemovedPrefix = "REMOVED ";
@@ -19,8 +19,6 @@ internal static class TemplatePreviewText
 
     public static string Render(IReadOnlyList<TemplateSlot> slots, int maxWidth = 770)
     {
-        // Text mode must mirror canvas slot geometry 1:1.
-        // Do not route through TemplateSlotLayout.Apply (compaction / flow / pict reflow).
         _ = maxWidth;
         var list = EnsurePictSlotsForPreview(slots);
 
@@ -38,8 +36,6 @@ internal static class TemplatePreviewText
             sb.Append(FormatSlotLine(slot));
         }
 
-        // REMOVED Data/Text can be restored from text; removed Picts are silent tombstones
-        // (deleting their line must not bring "REMOVED Pict" back on Apply).
         foreach (
             var slot in slots.Where(s =>
                 s.IsRemoved && !s.IsIgnored && s.Kind != TemplateSlotKind.Pict
@@ -51,8 +47,7 @@ internal static class TemplatePreviewText
             sb.Append(RemovedPrefix);
             sb.Append(FormatSlotLine(slot));
         }
-
-        // Ignored-from-list slots; omitted once dismissed (IsRemoved) via deleting IGNORED lines.
+        
         foreach (var slot in slots.Where(s => s.IsIgnored && !s.IsRemoved))
         {
             if (sb.Length > 0)
@@ -64,7 +59,7 @@ internal static class TemplatePreviewText
         return sb.ToString();
     }
 
-    /// <summary>Add missing default Picts for text preview without FixPictOverlaps (keeps Data X stable).</summary>
+    /// <summary>Добавление отсутствующих стандартных Picts для предварительного просмотра</summary>
     private static List<TemplateSlot> EnsurePictSlotsForPreview(IReadOnlyList<TemplateSlot> slots)
     {
         var list = slots.Select(s => s.Clone()).ToList();
@@ -96,7 +91,6 @@ internal static class TemplatePreviewText
         int updated = 0;
         int unmatched = 0;
 
-        // Include removed/ignored so prefixed lines and geometry sync still work.
         var dataSlots = slots.Where(s => s.Kind == TemplateSlotKind.Data).ToList();
         var textSlots = slots.Where(s => s.Kind == TemplateSlotKind.Text).ToList();
         var pictSlots = slots.Where(s => s.Kind == TemplateSlotKind.Pict).ToList();
@@ -110,7 +104,6 @@ internal static class TemplatePreviewText
             if (string.IsNullOrWhiteSpace(line))
                 continue;
 
-            // Strip status prefixes (order: REMOVED then IGNORED, or vice versa).
             bool markedRemoved = false;
             for (int i = 0; i < 2; i++)
             {
@@ -220,7 +213,6 @@ internal static class TemplatePreviewText
             }
         }
 
-        // Deleting an IGNORED line dismisses that slot from the template (same as remove).
         foreach (var slot in slots)
         {
             if (!slot.IsIgnored)
@@ -231,8 +223,6 @@ internal static class TemplatePreviewText
                 slot.IsRemoved = true;
         }
 
-        // Deleting a Pict line removes it (tombstone). Unlike Data/Text, missing Picts are
-        // auto-recreated by EnsurePictSlots unless IsRemoved is set.
         foreach (var slot in pictSlots)
         {
             if (slot.IsIgnored || usedPict.Contains(slot))
@@ -285,10 +275,6 @@ internal static class TemplatePreviewText
         return $"usertext:{Guid.NewGuid():N}";
     }
 
-    /// <summary>
-    /// IGNORED lines keep IsIgnored from the ignore-list; presence restores a dismissed slot.
-    /// REMOVED applies only to non-ignored slots.
-    /// </summary>
     private static void ApplyStatusFlags(TemplateSlot slot, bool markedRemoved)
     {
         if (slot.IsIgnored)

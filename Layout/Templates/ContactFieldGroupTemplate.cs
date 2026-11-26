@@ -2,7 +2,6 @@ using DcfToSf2.Parsing;
 
 namespace DcfToSf2.Layout.Templates;
 
-/// <summary>Phone / Fax / Telex / E_mail (CommunicationDetails / Contact).</summary>
 internal sealed class ContactFieldGroupTemplate : IFieldGroupTemplate
 {
     public const string TemplateName = "Contact";
@@ -87,10 +86,6 @@ internal sealed class ContactFieldGroupTemplate : IFieldGroupTemplate
         return LayoutContactFieldsDefault(block, visible, baseX, y, maxWidth, suppressFieldComments);
     }
 
-    /// <summary>
-    /// Contact template is always one horizontal row (Phone|Fax|Telex|E_mail).
-    /// Saved slots may drift to Y+20 after removing Fax/Telex — snap back to one line.
-    /// </summary>
     public static IReadOnlyList<TemplateSlot> FlattenToSingleRow(
         IReadOnlyList<TemplateSlot> slots,
         IReadOnlyList<Data>? presentFields = null
@@ -140,14 +135,13 @@ internal sealed class ContactFieldGroupTemplate : IFieldGroupTemplate
                 ordered.Add(d);
         }
 
-        // Bind Text to Data: prefer label→suffix match, else nearest geometry.
         var labelByOwner = new Dictionary<TemplateSlot, TemplateSlot>();
         foreach (
             var text in list.Where(s => !s.IsExcluded && s.Kind == TemplateSlotKind.Text)
         )
         {
             var owner = MatchLabelToData(text.Label, ordered) ?? NearestData(text, ordered);
-            // One primary label per field (first wins).
+
             if (!labelByOwner.ContainsKey(owner))
                 labelByOwner[owner] = text;
         }
@@ -173,7 +167,6 @@ internal sealed class ContactFieldGroupTemplate : IFieldGroupTemplate
             x += LayoutUtil.AdvanceAfterData(w, d.Suffix, gap);
         }
 
-        // Leftover texts (not primary label) — park left of their owner if possible.
         foreach (
             var text in list.Where(s => !s.IsExcluded && s.Kind == TemplateSlotKind.Text)
         )
@@ -220,17 +213,12 @@ internal sealed class ContactFieldGroupTemplate : IFieldGroupTemplate
     private static TemplateSlot NearestData(TemplateSlot s, List<TemplateSlot> data) =>
         data.OrderBy(d =>
             {
-                // Prefer field that starts at/after the label (label-before-field).
                 int dx = d.X >= s.X - 2 ? Math.Abs(d.X - s.X) : 10_000 + Math.Abs(d.X - s.X);
                 int dy = Math.Abs(s.Y - d.Y);
                 return dy * 1000 + dx;
             })
             .First();
 
-    /// <summary>
-    /// If a Text sits on the same X (or inside) a Data field, move it just to the left.
-    /// Avoids canvas illusion where wider Data looks "after" Text while text mode shows equal X.
-    /// </summary>
     public static void PlaceTextLabelsBeforeData(IList<TemplateSlot> list)
     {
         const int gap = 4;
@@ -246,7 +234,6 @@ internal sealed class ContactFieldGroupTemplate : IFieldGroupTemplate
             if (owner is null)
                 continue;
 
-            // Already strictly left of the field — keep.
             if (text.X + text.Width + gap <= owner.X)
                 continue;
 
@@ -262,7 +249,6 @@ internal sealed class ContactFieldGroupTemplate : IFieldGroupTemplate
         }
     }
 
-    /// <summary>Compact Phone|Fax|Telex|E_mail row without reading saved overrides.</summary>
     public static int LayoutContactFieldsDefault(
         Block block,
         List<Data> fields,

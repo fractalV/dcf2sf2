@@ -14,11 +14,9 @@ internal sealed class PrecedingDocDetailsFieldGroupTemplate : IFieldGroupTemplat
     public string Name => TemplateName;
 
     public FieldGroupMatch? TryMatch(IReadOnlyList<Data> fields, int startIndex, HashSet<string> ignoreFields)
-    {
-        // Applied when scanning from index 0 of a PrecedingDoc-like section, or when first field matches.
+    {    
         if (startIndex != 0)
         {
-            // Also allow match if current field is ModeCode and section looks like preceding doc
             if (startIndex < 0 || startIndex >= fields.Count)
                 return null;
             string last = LayoutUtil.GetLastToken(fields[startIndex].FieldElement.ElementName);
@@ -46,7 +44,6 @@ internal sealed class PrecedingDocDetailsFieldGroupTemplate : IFieldGroupTemplat
         if (!hasMode || !hasChild)
             return null;
 
-        // Consume all visible non-hyperlink fields of the section when matched at start
         if (startIndex == 0)
         {
             return new FieldGroupMatch
@@ -63,7 +60,6 @@ internal sealed class PrecedingDocDetailsFieldGroupTemplate : IFieldGroupTemplat
         };
     }
 
-    /// <summary>Match by block path leaf name.</summary>
     public static bool MatchesPath(string? path) =>
         !string.IsNullOrEmpty(path)
         && path.Contains("PrecedingDocDetails", StringComparison.OrdinalIgnoreCase);
@@ -106,7 +102,6 @@ internal sealed class PrecedingDocDetailsFieldGroupTemplate : IFieldGroupTemplat
             );
             if (mode is not null)
             {
-                // mode is first slot (width 44) in PlaceCompactRow above; pict already added there
                 used.Add(mode.FieldElement.ElementName);
             }
 
@@ -117,7 +112,6 @@ internal sealed class PrecedingDocDetailsFieldGroupTemplate : IFieldGroupTemplat
             y += 8;
         }
 
-        // Row 2: CustomsDocId | DTMDoc | PI — side by side
         int row2Y = y + 12;
         int x = baseX;
 
@@ -170,7 +164,6 @@ internal sealed class PrecedingDocDetailsFieldGroupTemplate : IFieldGroupTemplat
         if (customsFields.Count > 0 || dtmFields.Count > 0 || piFields.Count > 0)
             y = row2Y + Consts.DefaultHeightData + 16;
 
-        // Row 3: PrecedingDocumentNum | TIR | OtherPr
         int row3Y = y;
         x = baseX;
         var precNum = FindBareOrPrefixed("PrecedingDocumentNum");
@@ -220,7 +213,6 @@ internal sealed class PrecedingDocDetailsFieldGroupTemplate : IFieldGroupTemplat
         if (precNum is not null || tirFields.Count > 0 || otherNum is not null || otherDate is not null)
             y = row3Y + Consts.DefaultHeightData + 20;
 
-        // Goods details header + quantity
         var qtyFields = fields
             .Where(f =>
                 f.FieldElement.ElementName.Contains("PrecedingGoodsDetails", StringComparison.OrdinalIgnoreCase)

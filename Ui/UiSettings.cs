@@ -17,21 +17,15 @@ internal sealed class UiSettings
     public bool ForceList { get; set; }
     public bool Modernize { get; set; }
 
-    /// <summary>Last selected ignore fields (also used when no per-file entry).</summary>
     public List<string> IgnoreFields { get; set; } = [];
 
-    /// <summary>Ignore fields keyed by normalized full path of the DCF file.</summary>
     public Dictionary<string, List<string>> IgnoreFieldsByFile { get; set; } =
         new(StringComparer.OrdinalIgnoreCase);
 
-    /// <summary>Saved template slot geometry by template name.</summary>
     public Dictionary<string, List<TemplateSlotOverrideDto>> TemplateLayouts { get; set; } =
         new(StringComparer.OrdinalIgnoreCase);
-
-    /// <summary>Template names whose saved layout replaces code defaults (not overlay).</summary>
     public List<string> TemplateLayoutsReplaceBase { get; set; } = [];
 
-    /// <summary>User-created templates (from document tree branches).</summary>
     public List<UserTemplateDefinitionDto> UserTemplates { get; set; } = [];
 
     public static string GetSettingsPath()

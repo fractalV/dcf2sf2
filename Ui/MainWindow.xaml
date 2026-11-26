@@ -55,8 +55,8 @@
 
         <CheckBox x:Name="TwoColumnBox"
                   Grid.Row="2" Grid.Column="0" Grid.ColumnSpan="3"
-                  Content="Двухколоночная раскладка пар организаций"
-                  Margin="0,0,0,8" />
+                  Content="Организации в две колонки"
+                  Margin="0,0,0,8" Checked="TwoColumnBox_Checked" />
 
         <CheckBox x:Name="ForceListBox"
                   Grid.Row="3" Grid.Column="0" Grid.ColumnSpan="3"
@@ -65,7 +65,7 @@
 
         <CheckBox x:Name="ModernizeBox"
                   Grid.Row="4" Grid.Column="0" Grid.ColumnSpan="3"
-                  Content="Модернизация: дополнить существующий SF2 только новыми блоками"
+                  Content="Дополнить существующий SF2 только новыми блоками"
                   Margin="0,0,0,8"
                   ToolTip="Не перезаписывает имеющиеся секции; дописывает отсутствующие блоки из DCF и пишет список изменений в лог" />
 

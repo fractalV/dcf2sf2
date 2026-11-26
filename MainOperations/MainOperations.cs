@@ -17,7 +17,6 @@ internal static class MainOperations
 
         try
         {
-            // Apply saved template geometry from UI settings (if any)
             _ = Ui.UiSettings.Load();
 
             if (!options.InputFile.Exists)
@@ -31,7 +30,6 @@ internal static class MainOperations
                 ? Path.GetFileNameWithoutExtension(options.InputFile.Name)
                 : parsed.Header.DocumentName;
 
-            // Normalize document name from *.XSD.Dcf filenames
             if (documentName.EndsWith(".XSD", StringComparison.OrdinalIgnoreCase))
                 documentName = documentName[..^4];
             parsed.Header.DocumentName = documentName;

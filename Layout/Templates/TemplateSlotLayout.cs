@@ -16,7 +16,6 @@ internal static class TemplateSlotLayout
         bool suppressFieldComments = false
     )
     {
-        // Drop vertical space reserved for template Data that is absent in this DCF.
         slots = CompactAbsentRows(slots, fields);
 
         var used = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -40,8 +39,7 @@ internal static class TemplateSlotLayout
             int x = baseX + slot.X - OriginX;
             int y = startY + slot.Y - OriginY;
             int contentRight = baseX + maxWidth;
-            // Saved / FixPictOverlaps layouts can push slots far past the block — skip them
-            // without consuming the DCF field so rest/flow can still place it.
+
             if (x >= contentRight)
                 continue;
 
@@ -51,7 +49,7 @@ internal static class TemplateSlotLayout
             if (slot.Kind == TemplateSlotKind.Text)
             {
                 string text = string.IsNullOrEmpty(slot.Label) ? slot.Suffix : slot.Label;
-                // Skip orphan labels (e.g. ИНН/КПП) when the related Data field is absent.
+
                 if (slot.Suffix.StartsWith("label:", StringComparison.OrdinalIgnoreCase))
                 {
                     string dataSuffix = slot.Suffix["label:".Length..];
@@ -75,8 +73,6 @@ internal static class TemplateSlotLayout
                 if (!addPict)
                     continue;
 
-                // Pict must reference a real Data field name — never UI-only embed: StemHint.
-                // Owner may already be in `used` (placed by its Data slot).
                 var owner = FindField(fields, slot);
                 if (owner is null)
                     continue;
@@ -116,7 +112,7 @@ internal static class TemplateSlotLayout
             }
 
             block.Fields.Add(LayoutUtil.DataField(field, x, y, w, h, comment));
-            // Explicit Pict slots own placement; only auto-add when none exist for this template.
+
             if (addPict && !hasPictSlots)
                 LayoutUtil.MaybeAddPict(block, field, x, y, w);
             else if (addPict && hasPictSlots && !HasPictSlotFor(slots, slot))
@@ -135,10 +131,8 @@ internal static class TemplateSlotLayout
             .ToList();
         if (rest.Count > 0)
         {
-            // Contact leftovers keep compact widths (saved Contact template may omit E_mail).
             if (rest.All(ContactFieldGroupTemplate.IsContactField))
             {
-                // Continue the contact row started by this Apply (slots share startY after flatten).
                 int rowY = startY;
                 int rowRight = block
                     .Fields.Where(f =>
@@ -177,10 +171,6 @@ internal static class TemplateSlotLayout
         return maxBottom + 8;
     }
 
-    /// <summary>
-    /// When template Data slots have no match in the DCF, collapse their vertical bands
-    /// so later rows (e.g. IdentityCard after missing Contact/Address) move up.
-    /// </summary>
     public static IReadOnlyList<TemplateSlot> CompactAbsentRows(
         IReadOnlyList<TemplateSlot> slots,
         IReadOnlyList<Data> fields
@@ -190,7 +180,6 @@ internal static class TemplateSlotLayout
         if (list.Count == 0)
             return list;
 
-        // Anchor rows = distinct Y of Data slots (template structure).
         var dataSlots = list
             .Where(s => s.Kind == TemplateSlotKind.Data && !s.IsExcluded)
             .ToList();
@@ -213,13 +202,8 @@ internal static class TemplateSlotLayout
         int NextDataRowY(int rowY) =>
             rowYs.FirstOrDefault(y => y > rowY, rowY + Consts.DefaultHeightData + 8);
 
-        // Exact vertical span of this data row up to the next — do not inflate with a
-        // minimum per absent row (many tight Address rows would over-shift later bands
-        // onto ShortName / requisites).
         int GapAfter(int rowY) => Math.Max(0, NextDataRowY(rowY) - rowY);
 
-        // Drop only Data on absent rows + Text/Pict that belong to those suffixes
-        // (do not drop unrelated Pict moved into the band, e.g. removed CountryCode pict).
         var absentSuffixKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         foreach (var absY in absentRowYs)
         {
@@ -251,7 +235,7 @@ internal static class TemplateSlotLayout
         {
             if (MatchesAbsent(s))
                 return true;
-            // Orphan Text on an absent row band without a clear suffix link (Contact "Т.").
+
             if (s.Kind != TemplateSlotKind.Text)
                 return false;
             return absentRowYs.Any(absY =>
@@ -259,7 +243,6 @@ internal static class TemplateSlotLayout
             );
         });
 
-        // Present slots: subtract heights of absent rows strictly above them.
         int ShiftUp(int y)
         {
             int shift = 0;
@@ -279,11 +262,6 @@ internal static class TemplateSlotLayout
         return list;
     }
 
-    /// <summary>
-    /// Ensures each eligible Data slot has a companion Pict slot (movable/removable).
-    /// Does not recreate Picts that already exist (including removed ones).
-    /// Repositions row siblings so Pict does not overlap the next Data.
-    /// </summary>
     public static List<TemplateSlot> EnsurePictSlots(IReadOnlyList<TemplateSlot> slots)
     {
         var list = slots.Select(s => s.Clone()).ToList();
@@ -305,18 +283,13 @@ internal static class TemplateSlotLayout
             pictKeys.Add(key);
         }
 
-        // Do not fully reflow saved layouts — only push siblings that Pict actually overlaps.
         FixPictOverlaps(list);
         return list;
     }
 
-    /// <summary>
-    /// Soft right edge for template geometry. Prevents FixPictOverlaps cascades from
-    /// shoving slots to X≈80000 (then Apply would emit invisible SF2 fields).
-    /// </summary>
+
     public const int MaxTemplateContentX = 1200;
 
-    /// <summary>If a Pict covers another Data/Text on the same row, shift that sibling (and those to its right).</summary>
     private static void FixPictOverlaps(List<TemplateSlot> list)
     {
         foreach (
@@ -334,7 +307,6 @@ internal static class TemplateSlotLayout
                 && string.Equals(d.StemHint, pict.StemHint, StringComparison.OrdinalIgnoreCase)
             );
 
-            // Snap pict to the right of its Data if it still sits on top of the owner field.
             if (owner is not null && !owner.IsExcluded)
             {
                 int ownerRight = owner.X + Math.Max(owner.Width, 16);
@@ -355,7 +327,6 @@ internal static class TemplateSlotLayout
                 if (hit is null)
                     break;
 
-                // Do not shove fields from other template groups (e.g. embedded TirId on same Y).
                 if (
                     !hit.Group.Equals(pict.Group, StringComparison.OrdinalIgnoreCase)
                     && (
@@ -369,7 +340,6 @@ internal static class TemplateSlotLayout
                 if (shift <= 0)
                     break;
 
-                // Stop if the push would park content far past a normal form width.
                 if (hit.X + shift > MaxTemplateContentX)
                     break;
 
@@ -442,7 +412,6 @@ internal static class TemplateSlotLayout
         return string.IsNullOrEmpty(stem) ? slot.Suffix : $"{stem}_{slot.Suffix}";
     }
 
-    /// <summary>UI-only stem used when embedding templates in the preview editor.</summary>
     public static bool IsUiOnlyStemHint(string? stemHint) =>
         !string.IsNullOrEmpty(stemHint)
         && stemHint.Contains("embed:", StringComparison.OrdinalIgnoreCase);
@@ -452,7 +421,6 @@ internal static class TemplateSlotLayout
         if (string.IsNullOrEmpty(stemHint) || IsUiOnlyStemHint(stemHint))
             return string.Empty;
 
-        // "Address:embed:2" → keep structural part before embed
         int embedAt = stemHint.IndexOf("embed:", StringComparison.OrdinalIgnoreCase);
         if (embedAt > 0)
         {
@@ -484,7 +452,6 @@ internal static class TemplateSlotLayout
         if (candidates.Count == 0)
             return null;
 
-        // Disambiguate shared suffixes (CountryCode, OrganizationName) by template group.
         if (slot.Group.Equals(IdentityCardFieldGroupTemplate.TemplateName, StringComparison.OrdinalIgnoreCase))
         {
             candidates = candidates
@@ -496,7 +463,6 @@ internal static class TemplateSlotLayout
             candidates = candidates
                 .Where(f =>
                     !IdentityCardFieldGroupTemplate.IsIdentityCardField(f.FieldElement.ElementName)
-                    // UITN / similar CountryCode must not fill Address slots inside Organization.
                     && !f.FieldElement.ElementName.Contains("UITN", StringComparison.OrdinalIgnoreCase)
                 )
                 .ToList();
@@ -507,7 +473,6 @@ internal static class TemplateSlotLayout
         }
         else if (slot.Group.Equals(OrganizationFieldGroupTemplate.TemplateName, StringComparison.OrdinalIgnoreCase))
         {
-            // OrganizationName / CountryCode must not steal nested IdentityCard fields.
             candidates = candidates
                 .Where(f => !IdentityCardFieldGroupTemplate.IsIdentityCardField(f.FieldElement.ElementName))
                 .ToList();
@@ -526,7 +491,6 @@ internal static class TemplateSlotLayout
                 return hinted;
         }
 
-        // Prefer Address_* over other non-IdentityCard CountryCode when group is Address.
         if (slot.Group.Equals(AddressFieldGroupTemplate.TemplateName, StringComparison.OrdinalIgnoreCase))
         {
             var addr = candidates.FirstOrDefault(f =>
@@ -536,7 +500,6 @@ internal static class TemplateSlotLayout
                 return addr;
         }
 
-        // Unknown / empty group: never prefer IdentityCard for shared suffixes.
         if (string.IsNullOrEmpty(slot.Group)
             || !slot.Group.Equals(IdentityCardFieldGroupTemplate.TemplateName, StringComparison.OrdinalIgnoreCase))
         {

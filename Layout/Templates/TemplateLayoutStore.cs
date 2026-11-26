@@ -1,6 +1,5 @@
 namespace DcfToSf2.Layout.Templates;
 
-/// <summary>Persisted per-slot geometry overrides for templates.</summary>
 internal sealed class TemplateSlotOverrideDto
 {
     public string Id { get; set; } = string.Empty;
@@ -9,13 +8,9 @@ internal sealed class TemplateSlotOverrideDto
     public int Width { get; set; }
     public int Height { get; set; }
     public bool Removed { get; set; }
-
-    /// <summary>True when the slot was dragged in from another template (full metadata required).</summary>
     public bool Embedded { get; set; }
-
     public string? Suffix { get; set; }
     public string? Label { get; set; }
-    /// <summary>SF2 Data comment after '`'.</summary>
     public string? Comment { get; set; }
     public TemplateSlotKind Kind { get; set; }
     public string? Group { get; set; }
@@ -136,11 +131,6 @@ internal static class TemplateLayoutStore
             return _replaceBase.Contains(templateName);
     }
 
-    /// <param name="replaceBase">
-    /// When true, removed non-Pict slots are dropped and the remaining layout becomes the new base
-    /// (full metadata). Removed Pict slots are kept as tombstones so EnsurePictSlots / layout Apply
-    /// do not recreate them. When false and the template is not already a replaced base, saves as overrides.
-    /// </param>
     public static void SaveTemplate(
         string templateName,
         IEnumerable<TemplateSlot> slots,
@@ -152,7 +142,6 @@ internal static class TemplateLayoutStore
         lock (Gate)
             asBase = replaceBase || _replaceBase.Contains(templateName);
 
-        // Pict tombstones must survive replace-base: otherwise EnsurePictSlots recreates them.
         if (replaceBase)
             slotList = slotList.Where(s => !s.IsRemoved || s.Kind == TemplateSlotKind.Pict).ToList();
 
@@ -236,8 +225,6 @@ internal static class TemplateLayoutStore
 
         if (replaceBase)
         {
-            // Replaced base is authoritative. EnsurePictSlots still runs so remaining
-            // active Picts get overlap fixes, but removed Pict tombstones block recreation.
             return TemplateSlotLayout.EnsurePictSlots(MaterializeBase(overrides, expanded));
         }
 
@@ -285,11 +272,9 @@ internal static class TemplateLayoutStore
             result.Add(FromEmbeddedDto(o));
         }
 
-        // Overrides may restore old X that collide with Pict — resolve after merge.
         return TemplateSlotLayout.EnsurePictSlots(result);
     }
 
-    /// <summary>Full base replacement: use saved slots; keep IsIgnored from matching defaults when possible.</summary>
     private static List<TemplateSlot> MaterializeBase(
         List<TemplateSlotOverrideDto> overrides,
         IReadOnlyList<TemplateSlot> defaults

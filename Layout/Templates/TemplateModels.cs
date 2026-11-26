@@ -12,7 +12,6 @@ internal sealed class TemplateSlot
     public string Id { get; set; } = string.Empty;
     public required string Suffix { get; set; }
     public string Label { get; set; } = string.Empty;
-    /// <summary>SF2 Data comment after '`' (persisted with template layout).</summary>
     public string Comment { get; set; } = string.Empty;
     public TemplateSlotKind Kind { get; set; } = TemplateSlotKind.Data;
     public int X { get; set; }
@@ -20,12 +19,9 @@ internal sealed class TemplateSlot
     public int Width { get; set; }
     public int Height { get; set; }
     public bool IsIgnored { get; set; }
-    /// <summary>Removed from this template layout (persisted); not emitted to SF2.</summary>
     public bool IsRemoved { get; set; }
-    /// <summary>Added by dragging another template into this one; persisted with full metadata.</summary>
     public bool IsEmbedded { get; set; }
     public string Group { get; set; } = string.Empty;
-    /// <summary>Optional name fragment to disambiguate duplicate suffixes (e.g. DTMDocDetails).</summary>
     public string StemHint { get; set; } = string.Empty;
 
     public bool IsExcluded => IsIgnored || IsRemoved;
@@ -74,9 +70,7 @@ internal interface IFieldGroupTemplate
 
     int Layout(Block block, FieldGroupMatch match, int baseX, int y, int maxWidth, HashSet<string> ignoreFields);
 
-    /// <summary>Default preview slots (without persisted overrides).</summary>
     IReadOnlyList<TemplateSlot> GetDefaultPreviewSlots(HashSet<string> ignoreFields);
 
-    /// <summary>Preview slots with persisted overrides applied.</summary>
     IReadOnlyList<TemplateSlot> GetPreviewSlots(HashSet<string> ignoreFields);
 }

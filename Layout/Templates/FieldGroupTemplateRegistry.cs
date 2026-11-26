@@ -79,7 +79,6 @@ internal sealed class FieldGroupTemplateRegistry
                 return (_precedingDoc, m);
         }
 
-        // Path-scoped user templates (whole branch)
         if (startIndex == 0)
         {
             foreach (var ut in _user)
@@ -107,9 +106,6 @@ internal sealed class FieldGroupTemplateRegistry
         return null;
     }
 
-    /// <summary>
-    /// Layout remaining fields using templates in document order, then stacked fallback.
-    /// </summary>
     public int LayoutWithTemplates(
         Block block,
         List<Data> fields,
@@ -126,7 +122,6 @@ internal sealed class FieldGroupTemplateRegistry
             .Where(f => LayoutUtil.IsVisible(f, ignoreFields) && !LayoutUtil.IsBlockOpenMarker(f))
             .ToList();
 
-        // Whole-section preceding doc
         if (PrecedingDocDetailsFieldGroupTemplate.MatchesPath(blockPath))
         {
             var m = _precedingDoc.TryMatch(remaining, 0, ignoreFields);
@@ -140,7 +135,6 @@ internal sealed class FieldGroupTemplateRegistry
             }
         }
 
-        // Whole-branch user template
         foreach (var ut in _user)
         {
             var pathMatch = ut.TryMatchPath(remaining, ignoreFields, blockPath);
@@ -185,7 +179,6 @@ internal sealed class FieldGroupTemplateRegistry
                     continue;
                 }
 
-                // Path user templates already applied at startIndex 0
                 if (template is UserDefinedFieldGroupTemplate && i == 0
                     && UserDefinedFieldGroupTemplate.MatchesPath(blockPath, ((UserDefinedFieldGroupTemplate)template).MatchPath))
                 {

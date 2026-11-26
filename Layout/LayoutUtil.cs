@@ -64,7 +64,6 @@ internal static class LayoutUtil
     public const int PictSize = 12;
     public const int PictGap = 2;
 
-    /// <summary>Whether a Data field with this last-token suffix (and optional type string) gets a Pict.</summary>
     public static bool ShouldAddPict(string suffixOrLastToken, string? elementValue = null, bool datePict = false)
     {
         string last = GetLastToken(suffixOrLastToken);
@@ -81,10 +80,6 @@ internal static class LayoutUtil
         return isCode || isDate;
     }
 
-    /// <summary>
-    /// Places Pict immediately to the right of the Data field (no overlap into the field).
-    /// Returns horizontal space reserved after the field (0 if no pict).
-    /// </summary>
     public static int MaybeAddPict(
         Block block,
         Data field,
@@ -162,7 +157,6 @@ internal static class LayoutUtil
             int pictReserve = wantsPict ? PictSize + PictGap : 0;
             int maxFieldW = Math.Max(16, right - baseX - pictReserve);
 
-            // Wrap when the field (at its natural size) does not fit on the current row.
             if (x > baseX && x + Math.Min(naturalW, maxFieldW) + pictReserve + gap > right)
             {
                 x = baseX;
@@ -230,7 +224,6 @@ internal static class LayoutUtil
             _ => suffix,
         };
 
-    /// <summary>Default SF2 Data comment (after '`') for built-in template field suffixes.</summary>
     public static string DefaultFieldComment(string suffix, string? group = null)
     {
         string g = group ?? string.Empty;
@@ -316,7 +309,6 @@ internal static class LayoutUtil
         return s == suffix ? null : s;
     }
 
-    /// <summary>Horizontal space after a Data field before the next sibling (gap + optional Pict).</summary>
     public static int AdvanceAfterData(int fieldWidth, string suffixOrLastToken, int fieldGap = 4) =>
         Math.Max(fieldWidth, 16)
         + fieldGap

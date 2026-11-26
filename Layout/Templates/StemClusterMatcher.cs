@@ -35,7 +35,6 @@ internal static class StemClusterMatcher
         var clustered = new List<Data>();
         Data? header = null;
 
-        // Optional B header just before with same stem name
         if (startIndex > 0)
         {
             var prev = fields[startIndex - 1];
@@ -125,7 +124,6 @@ internal static class StemClusterMatcher
                 string stem = LayoutUtil.GetStem(f.FieldElement.ElementName);
                 if (!LayoutUtil.StemContains(stem, stemToken) && !stem.Equals(stemToken, StringComparison.OrdinalIgnoreCase))
                 {
-                    // also: Name is StemToken_Suffix
                     if (!f.FieldElement.ElementName.Contains(stemToken + "_", StringComparison.OrdinalIgnoreCase)
                         && !f.FieldElement.ElementName.StartsWith(stemToken + "_", StringComparison.OrdinalIgnoreCase))
                         return false;

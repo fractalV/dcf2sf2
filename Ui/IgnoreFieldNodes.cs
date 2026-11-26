@@ -32,8 +32,6 @@ internal sealed class IgnoreBlockNode : INotifyPropertyChanged
 
     public string Path { get; }
     public string Title { get; }
-
-    /// <summary>Non-null when this node is a B-block section (e.g. GTDID), not a DCF path segment.</summary>
     public string? SectionKey { get; }
 
     public bool IsSection => !string.IsNullOrEmpty(SectionKey);
@@ -66,7 +64,6 @@ internal sealed class IgnoreBlockNode : INotifyPropertyChanged
     public List<IgnoreFieldNode> Fields { get; }
     public List<IgnoreBlockNode> ChildBlocks { get; }
 
-    /// <summary>Child path/section nodes first, then fields — for TreeView binding.</summary>
     public IEnumerable<object> Children => ChildBlocks.Cast<object>().Concat(Fields);
 
     public IEnumerable<IgnoreFieldNode> AllFields() =>
