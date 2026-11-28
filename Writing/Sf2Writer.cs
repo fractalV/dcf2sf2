@@ -1,4 +1,5 @@
 using System.Text;
+using DcfToSf2.Diagnostics;
 using DcfToSf2.Layout;
 
 namespace DcfToSf2.Writing;
@@ -8,8 +9,21 @@ internal static class Sf2Writer
     public static string GetPath(DirectoryInfo outputDirectory, string documentName) =>
         Path.Combine(outputDirectory.FullName, $"{documentName}.sf2");
 
-    public static void Write(DirectoryInfo outputDirectory, Sf2Document document)
+    public static string NormalizeSectionName(string blockName)
     {
+        string sectionName = blockName.Replace("MAIN\\", "", StringComparison.OrdinalIgnoreCase);
+        if (string.IsNullOrEmpty(sectionName))
+            sectionName = Consts.DefaultBlockName;
+        return sectionName;
+    }
+
+    public static void Write(
+        DirectoryInfo outputDirectory,
+        Sf2Document document,
+        IConversionLog? log = null
+    )
+    {
+        log ??= ConsoleConversionLog.Instance;
         Directory.CreateDirectory(outputDirectory.FullName);
         string path = GetPath(outputDirectory, document.DocumentName);
         var lines = Render(document);
@@ -17,9 +31,7 @@ internal static class Sf2Writer
         foreach (var line in lines)
             sw.WriteLine(line);
 
-        Console.ForegroundColor = ConsoleColor.Green;
-        Console.WriteLine("Файл записан: " + path);
-        Console.ResetColor();
+        log.Success("Файл записан: " + path);
     }
 
     public static List<string> Render(Sf2Document document)
@@ -27,33 +39,34 @@ internal static class Sf2Writer
         List<string> lines = [$"DOCUMENT={document.DocumentName}"];
 
         foreach (var block in document.Blocks)
+            lines.AddRange(RenderBlock(block));
+
+        return lines;
+    }
+
+    public static List<string> RenderBlock(Block block)
+    {
+        string sectionName = NormalizeSectionName(block.Name);
+        var lines = new List<string> { $"[{sectionName}]" };
+
+        int height = Math.Max(block.MaxY() + Consts.DefaultHeightData + 20, 40);
+        string title = block.Title ?? string.Empty;
+        if (block.IsRepeating && !string.IsNullOrEmpty(title) && !title.Contains("%d"))
+            title = title.TrimEnd() + " %d";
+
+        lines.Add($"{Consts.DefaultWidthBlock}x{height} 0 0 `{title}");
+
+        string body = block.ToString().TrimEnd();
+        if (!string.IsNullOrEmpty(body))
         {
-            string sectionName = block.Name.Replace("MAIN\\", "", StringComparison.OrdinalIgnoreCase);
-            if (string.IsNullOrEmpty(sectionName))
-                sectionName = Consts.DefaultBlockName;
-
-            lines.Add($"[{sectionName}]");
-
-            int height = Math.Max(block.MaxY() + Consts.DefaultHeightData + 20, 40);
-            string title = block.Title ?? string.Empty;
-            if (block.IsRepeating && !string.IsNullOrEmpty(title) && !title.Contains("%d"))
-                title = title.TrimEnd() + " %d";
-
-            lines.Add($"{Consts.DefaultWidthBlock}x{height} 0 0 `{title}");
-
-            string body = block.ToString().TrimEnd();
-            if (!string.IsNullOrEmpty(body))
+            foreach (var row in body.Replace("\r\n", "\n").Split('\n'))
             {
-                foreach (var row in body.Replace("\r\n", "\n").Split('\n'))
-                {
-                    if (!string.IsNullOrWhiteSpace(row))
-                        lines.Add(row);
-                }
+                if (!string.IsNullOrWhiteSpace(row))
+                    lines.Add(row);
             }
-
-            lines.Add("/");
         }
 
+        lines.Add("/");
         return lines;
     }
 }

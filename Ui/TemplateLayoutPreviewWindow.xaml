@@ -1,0 +1,177 @@
+<Window x:Class="DcfToSf2.Ui.TemplateLayoutPreviewWindow"
+        x:ClassModifier="internal"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Шаблоны раскладки"
+        Height="600"
+        Width="980"
+        MinHeight="420"
+        MinWidth="760"
+        WindowStartupLocation="CenterOwner"
+        ShowInTaskbar="False">
+    <DockPanel Margin="12">
+        <DockPanel DockPanel.Dock="Top" Margin="0,0,0,8">
+            <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+                <Button x:Name="AddTextButton"
+                        Content="Текст…"
+                        Width="88"
+                        Padding="12,4"
+                        Margin="0,0,8,0"
+                        ToolTip="Добавить текстовое поле на холст"
+                        Click="AddText_Click" />
+                <Button x:Name="DeleteButton"
+                        Content="Удалить"
+                        Width="88"
+                        Padding="12,4"
+                        Margin="0,0,8,0"
+                        ToolTip="Удалить выбранные поля из шаблона (Delete)"
+                        Click="Delete_Click" />
+                <Button x:Name="RestoreButton"
+                        Content="Вернуть"
+                        Width="88"
+                        Padding="12,4"
+                        Margin="0,0,8,0"
+                        ToolTip="Восстановить выбранные удалённые поля"
+                        Click="Restore_Click" />
+                <Button Content="Сбросить"
+                        Width="88"
+                        Padding="12,4"
+                        Margin="0,0,8,0"
+                        ToolTip="Вернуть геометрию шаблона по умолчанию"
+                        Click="Reset_Click" />
+                <Button Content="Сохранить"
+                        Width="88"
+                        Padding="12,4"
+                        Margin="0,0,8,0"
+                        ToolTip="Сохранить положение, ширину и удалённые слоты"
+                        Click="Save_Click" />
+                <Button Content="Закрыть"
+                        IsCancel="True"
+                        Width="88"
+                        Padding="12,4"
+                        Click="Close_Click" />
+            </StackPanel>
+            <TextBlock VerticalAlignment="Center"
+                       TextWrapping="Wrap"
+                       Text="Рамка — выделить; Ctrl+клик — добавить; перетаскивание (сетка 4); край — ширина; Delete — удалить; «Текст…» — подпись; Esc — снять выделение. Перетащите шаблон из списка на холст." />
+        </DockPanel>
+
+        <TextBlock x:Name="StatusText"
+                   DockPanel.Dock="Bottom"
+                   Margin="0,8,0,0"
+                   Foreground="Gray" />
+
+        <Grid>
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="220" />
+                <ColumnDefinition Width="12" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+
+            <GroupBox Header="Шаблоны" Padding="4">
+                <ListBox x:Name="TemplatesList"
+                         DisplayMemberPath="Name"
+                         SelectionChanged="TemplatesList_SelectionChanged"
+                         PreviewMouseLeftButtonDown="TemplatesList_PreviewMouseLeftButtonDown"
+                         PreviewMouseMove="TemplatesList_PreviewMouseMove"
+                         PreviewMouseRightButtonDown="TemplatesList_PreviewMouseRightButtonDown"
+                         ContextMenuOpening="TemplatesList_ContextMenuOpening">
+                    <ListBox.ContextMenu>
+                        <ContextMenu>
+                            <MenuItem x:Name="DeleteTemplateMenuItem"
+                                      Header="Удалить"
+                                      Click="DeleteTemplate_Click" />
+                        </ContextMenu>
+                    </ListBox.ContextMenu>
+                </ListBox>
+            </GroupBox>
+
+            <GroupBox Grid.Column="2" Header="Расположение полей" Padding="4">
+                <DockPanel>
+                    <DockPanel DockPanel.Dock="Top" Margin="0,0,0,6">
+                        <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+                            <Button x:Name="ZoomOutButton"
+                                    Content="−"
+                                    Width="28"
+                                    Padding="4,4"
+                                    Margin="0,0,4,0"
+                                    ToolTip="Уменьшить (Ctrl+колёсико)"
+                                    Click="ZoomOut_Click" />
+                            <Button x:Name="ZoomResetButton"
+                                    Content="100%"
+                                    MinWidth="52"
+                                    Padding="8,4"
+                                    Margin="0,0,4,0"
+                                    ToolTip="Сбросить масштаб"
+                                    Click="ZoomReset_Click" />
+                            <Button x:Name="ZoomInButton"
+                                    Content="+"
+                                    Width="28"
+                                    Padding="4,4"
+                                    Margin="0,0,12,0"
+                                    ToolTip="Увеличить (Ctrl+колёсико)"
+                                    Click="ZoomIn_Click" />
+                            <CheckBox x:Name="ShowRowGuidesCheck"
+                                      Content="Строки"
+                                      IsChecked="True"
+                                      Margin="0,0,12,0"
+                                      VerticalAlignment="Center"
+                                      ToolTip="Показывать линии Y у Data-полей — разные строки не сливаются визуально"
+                                      Checked="ShowRowGuides_Changed"
+                                      Unchecked="ShowRowGuides_Changed" />
+                            <Button x:Name="ApplyTextButton"
+                                    Content="Применить"
+                                    Width="88"
+                                    Padding="12,4"
+                                    Margin="0,0,8,0"
+                                    Visibility="Collapsed"
+                                    ToolTip="Применить правки текста к слотам шаблона"
+                                    Click="ApplyText_Click" />
+                            <RadioButton x:Name="ModeCanvas"
+                                         Content="Холст"
+                                         IsChecked="True"
+                                         Margin="0,0,12,0"
+                                         VerticalAlignment="Center"
+                                         Checked="Mode_Checked" />
+                            <RadioButton x:Name="ModeText"
+                                         Content="Текст"
+                                         VerticalAlignment="Center"
+                                         Checked="Mode_Checked" />
+                        </StackPanel>
+                        <TextBlock VerticalAlignment="Center"
+                                   Foreground="Gray"
+                                   Text="Холст — правка мышкой; Текст — SF2 (Data/Text/Pict; REMOVED — удалённые; IGNORED — из списка игнора). Pict можно двигать и удалять." />
+                    </DockPanel>
+
+                    <ScrollViewer x:Name="CanvasHost"
+                                  HorizontalScrollBarVisibility="Auto"
+                                  VerticalScrollBarVisibility="Auto"
+                                  AllowDrop="True"
+                                  PreviewMouseWheel="CanvasHost_PreviewMouseWheel"
+                                  DragOver="PreviewDropTarget_DragOver"
+                                  Drop="PreviewDropTarget_Drop">
+                        <Canvas x:Name="PreviewCanvas"
+                                Width="800"
+                                Height="400"
+                                Background="#FFF8F8F8"
+                                ClipToBounds="False"
+                                AllowDrop="True"
+                                DragOver="PreviewDropTarget_DragOver"
+                                Drop="PreviewDropTarget_Drop" />
+                    </ScrollViewer>
+
+                    <TextBox x:Name="PreviewText"
+                             Visibility="Collapsed"
+                             AcceptsReturn="True"
+                             AcceptsTab="True"
+                             VerticalScrollBarVisibility="Auto"
+                             HorizontalScrollBarVisibility="Auto"
+                             FontFamily="Consolas"
+                             FontSize="12"
+                             TextWrapping="NoWrap"
+                             SpellCheck.IsEnabled="False" />
+                </DockPanel>
+            </GroupBox>
+        </Grid>
+    </DockPanel>
+</Window>

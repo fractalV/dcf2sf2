@@ -7,13 +7,21 @@ namespace DcfToSf2.MainOperations;
 
 internal static class MainOperations
 {
-    public static int ConvertFile(ConversionOptions options)
+    public static int ConvertFile(
+        ConversionOptions options,
+        IConversionLog? log = null,
+        bool writePreview = true
+    )
     {
+        log ??= ConsoleConversionLog.Instance;
+
         try
         {
+            _ = Ui.UiSettings.Load();
+
             if (!options.InputFile.Exists)
             {
-                Console.Error.WriteLine($"Файл не найден: {options.InputFile.FullName}");
+                log.Error($"Файл не найден: {options.InputFile.FullName}");
                 return 1;
             }
 
@@ -22,40 +30,42 @@ internal static class MainOperations
                 ? Path.GetFileNameWithoutExtension(options.InputFile.Name)
                 : parsed.Header.DocumentName;
 
-            // Normalize document name from *.XSD.Dcf filenames
             if (documentName.EndsWith(".XSD", StringComparison.OrdinalIgnoreCase))
                 documentName = documentName[..^4];
             parsed.Header.DocumentName = documentName;
 
-            WarningsWriter.Write(options.OutputDirectory, documentName, parsed.Diagnostics);
+            WarningsWriter.Write(options.OutputDirectory, documentName, parsed.Diagnostics, log);
 
             if (parsed.Diagnostics.HasErrors)
             {
-                Console.ForegroundColor = ConsoleColor.Red;
-                Console.WriteLine("Критические ошибки DCF — SF2 не создан.");
-                Console.ResetColor();
+                log.Error("Критические ошибки DCF — SF2 не создан.");
                 return 2;
             }
 
             var document = Sf2LayoutBuilder.Build(parsed, options);
 
-            // Console preview
-            foreach (var line in Sf2Writer.Render(document))
-                Console.WriteLine(line);
+            if (options.Modernize)
+                return Sf2Modernizer.Apply(options.OutputDirectory, document, log);
 
-            Sf2Writer.Write(options.OutputDirectory, document);
-            ListSf2Writer.Write(options.OutputDirectory, parsed, document, options);
+            if (writePreview)
+            {
+                foreach (var line in Sf2Writer.Render(document))
+                    log.Info(line);
+            }
+
+            Sf2Writer.Write(options.OutputDirectory, document, log);
+            ListSf2Writer.Write(options.OutputDirectory, parsed, document, options, log);
             return 0;
         }
         catch (NotSupportedException)
         {
-            Console.WriteLine("Install System.Text.Encoding.CodePages...");
-            Console.WriteLine("dotnet add package System.Text.Encoding.CodePages");
+            log.Error("Install System.Text.Encoding.CodePages...");
+            log.Info("dotnet add package System.Text.Encoding.CodePages");
             return 1;
         }
         catch (Exception ex)
         {
-            Console.WriteLine(ex.ToString());
+            log.Error(ex.ToString());
             return 1;
         }
     }

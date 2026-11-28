@@ -1,83 +1,106 @@
 ﻿using System.CommandLine;
-using System.CommandLine.Builder;
-using System.CommandLine.Parsing;
+using System.Runtime.InteropServices;
 using System.Text;
 
 namespace DcfToSf2;
 
-internal class Program
+internal static class Program
 {
-    static async Task<int> Main(string[] args)
+    [DllImport("kernel32.dll", SetLastError = true)]
+    private static extern bool AllocConsole();
+
+    [DllImport("kernel32.dll", SetLastError = true)]
+    private static extern bool AttachConsole(int dwProcessId);
+
+    private const int AttachParentProcess = -1;
+
+    [STAThread]
+    static int Main(string[] args)
     {
         Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
 
-        var fileOption = new Option<FileInfo>(
-            name: "--file",
-            description: "Входной DCF файл"
-        )
+        if (args.Length > 0)
+            return RunCli(args);
+
+        var app = new App();
+        app.InitializeComponent();
+        app.Run();
+        return 0;
+    }
+
+    private static int RunCli(string[] args)
+    {
+        if (!AttachConsole(AttachParentProcess))
+            AllocConsole();
+
+        Console.OutputEncoding = Encoding.UTF8;
+        Console.InputEncoding = Encoding.UTF8;
+
+        var fileOption = new Option<FileInfo>("--file", "-f")
         {
-            IsRequired = true,
+            Description = "Входной DCF файл",
+            Required = true,
         };
-        fileOption.AddAlias("-f");
 
-        var outOption = new Option<DirectoryInfo?>(
-            name: "--out",
-            description: "Каталог вывода (по умолчанию — каталог DCF)"
-        );
-        outOption.AddAlias("-o");
+        var outOption = new Option<DirectoryInfo?>("--out", "-o")
+        {
+            Description = "Каталог вывода (по умолчанию — каталог DCF)",
+        };
 
-        var twoColumnOption = new Option<bool>(
-            name: "--two-column",
-            description: "Двухколоночная раскладка пар организаций (Seller|Buyer, Consignor|Consignee)"
-        );
-        twoColumnOption.AddAlias("-2");
+        var twoColumnOption = new Option<bool>("--two-column", "-2")
+        {
+            Description =
+                "Двухколоночная раскладка пар организаций (Seller|Buyer, Consignor|Consignee)",
+        };
 
-        var ignoreOption = new Option<string?>(
-            name: "--ignore-fields",
-            description: "Поля для пропуска (суффиксы через запятую), напр. Fax,Telex"
-        );
+        var ignoreOption = new Option<string?>("--ignore-fields")
+        {
+            Description = "Поля для пропуска (суффиксы через запятую), напр. Fax,Telex",
+        };
 
-        var forceListOption = new Option<bool>(
-            name: "--force-list",
-            description: "Перезаписать List.sf2 если уже существует"
-        );
+        var forceListOption = new Option<bool>("--force-list")
+        {
+            Description = "Перезаписать List.sf2 если уже существует",
+        };
+
+        var modernizeOption = new Option<bool>("--modernize")
+        {
+            Description =
+                "Дополнить существующий SF2 новыми блоками из DCF (остальные секции не трогать)",
+        };
 
         var rootCommand = new RootCommand("Утилита для конвертации dcf в sf2");
-        rootCommand.AddOption(fileOption);
-        rootCommand.AddOption(outOption);
-        rootCommand.AddOption(twoColumnOption);
-        rootCommand.AddOption(ignoreOption);
-        rootCommand.AddOption(forceListOption);
+        rootCommand.Options.Add(fileOption);
+        rootCommand.Options.Add(outOption);
+        rootCommand.Options.Add(twoColumnOption);
+        rootCommand.Options.Add(ignoreOption);
+        rootCommand.Options.Add(forceListOption);
+        rootCommand.Options.Add(modernizeOption);
 
-        int exitCode = 0;
-        rootCommand.SetHandler(
-            (file, outDir, twoColumn, ignoreFields, forceList) =>
+        rootCommand.SetAction(parseResult =>
+        {
+            var file = parseResult.GetValue(fileOption)!;
+            var outDir = parseResult.GetValue(outOption);
+            var output =
+                outDir
+                ?? file.Directory
+                ?? new DirectoryInfo(Environment.CurrentDirectory);
+
+            var options = new ConversionOptions
             {
-                var output =
-                    outDir
-                    ?? file.Directory
-                    ?? new DirectoryInfo(Environment.CurrentDirectory);
+                InputFile = file,
+                OutputDirectory = output,
+                TwoColumn = parseResult.GetValue(twoColumnOption),
+                ForceList = parseResult.GetValue(forceListOption),
+                Modernize = parseResult.GetValue(modernizeOption),
+                IgnoreFields = ConversionOptions.ParseIgnoreFields(
+                    parseResult.GetValue(ignoreOption)
+                ),
+            };
 
-                var options = new ConversionOptions
-                {
-                    InputFile = file,
-                    OutputDirectory = output,
-                    TwoColumn = twoColumn,
-                    ForceList = forceList,
-                    IgnoreFields = ConversionOptions.ParseIgnoreFields(ignoreFields),
-                };
+            return MainOperations.MainOperations.ConvertFile(options);
+        });
 
-                exitCode = MainOperations.MainOperations.ConvertFile(options);
-            },
-            fileOption,
-            outOption,
-            twoColumnOption,
-            ignoreOption,
-            forceListOption
-        );
-
-        var parser = new CommandLineBuilder(rootCommand).UseDefaults().Build();
-        await parser.InvokeAsync(args);
-        return exitCode;
+        return rootCommand.Parse(args).Invoke();
     }
 }

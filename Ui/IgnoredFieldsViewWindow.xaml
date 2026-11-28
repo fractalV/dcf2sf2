@@ -1,0 +1,65 @@
+<Window x:Class="DcfToSf2.Ui.IgnoredFieldsViewWindow"
+        x:ClassModifier="internal"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Игнорируемые поля"
+        Height="480"
+        Width="780"
+        MinHeight="320"
+        MinWidth="560"
+        WindowStartupLocation="CenterOwner"
+        ShowInTaskbar="False">
+    <DockPanel Margin="12">
+        <DockPanel DockPanel.Dock="Top" Margin="0,0,0,8">
+            <Button DockPanel.Dock="Right"
+                    Content="Закрыть"
+                    IsCancel="True"
+                    Width="88"
+                    Padding="12,4"
+                    Click="Close_Click" />
+            <TextBlock x:Name="SummaryText"
+                       VerticalAlignment="Center"
+                       TextWrapping="Wrap" />
+        </DockPanel>
+
+        <GroupBox DockPanel.Dock="Top"
+                  Header="Правила"
+                  Margin="0,0,0,8"
+                  Padding="6">
+            <TextBox x:Name="RulesBox"
+                     IsReadOnly="True"
+                     TextWrapping="Wrap"
+                     MaxHeight="72"
+                     VerticalScrollBarVisibility="Auto"
+                     BorderThickness="0"
+                     Background="Transparent" />
+        </GroupBox>
+
+        <DataGrid x:Name="FieldsGrid"
+                  AutoGenerateColumns="False"
+                  IsReadOnly="True"
+                  CanUserAddRows="False"
+                  CanUserDeleteRows="False"
+                  HeadersVisibility="Column"
+                  GridLinesVisibility="Horizontal"
+                  AlternatingRowBackground="#FFF7F7F7"
+                  SelectionMode="Extended"
+                  SelectionUnit="FullRow">
+            <DataGrid.Columns>
+                <DataGridTextColumn Header="Блок"
+                                    Binding="{Binding Block}"
+                                    Width="180" />
+                <DataGridTextColumn Header="Поле"
+                                    Binding="{Binding FieldName}"
+                                    Width="*"
+                                    MinWidth="160" />
+                <DataGridTextColumn Header="Подпись"
+                                    Binding="{Binding Label}"
+                                    Width="160" />
+                <DataGridTextColumn Header="Почему"
+                                    Binding="{Binding MatchedBy}"
+                                    Width="160" />
+            </DataGrid.Columns>
+        </DataGrid>
+    </DockPanel>
+</Window>

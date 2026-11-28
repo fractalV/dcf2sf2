@@ -1,0 +1,200 @@
+using DcfToSf2.Parsing;
+
+namespace DcfToSf2.Layout.Templates;
+
+internal sealed class IdentityCardFieldGroupTemplate : IFieldGroupTemplate
+{
+    public const string TemplateName = "IdentityCard";
+    public const string StemToken = "IdentityCard";
+
+    public static readonly string[] Suffixes =
+    [
+        "IdentityCardCode",
+        "IdentityCardName",
+        "IdentityCardSeries",
+        "IdentityCardNumber",
+        "IdentityCardDate",
+        "CountryCode",
+        "OrganizationName",
+        "IssuerCode",
+        "AuthorityId",
+        "DocValidityDate",
+        "FullIdentityCardName",
+    ];
+
+    private static readonly HashSet<string> SuffixSet = new(Suffixes, StringComparer.OrdinalIgnoreCase);
+
+    public string Name => TemplateName;
+
+    public FieldGroupMatch? TryMatch(IReadOnlyList<Data> fields, int startIndex, HashSet<string> ignoreFields)
+    {
+        if (startIndex < 0 || startIndex >= fields.Count)
+            return null;
+
+        var first = fields[startIndex];
+        if (!LayoutUtil.IsVisible(first, ignoreFields) || LayoutUtil.IsBlockType(first))
+            return null;
+
+        string name = first.FieldElement.ElementName;
+        if (!name.Contains(StemToken, StringComparison.OrdinalIgnoreCase))
+            return null;
+
+        string last = LayoutUtil.GetLastToken(name);
+        var clustered = new List<Data>();
+        string stem = LayoutUtil.GetStem(name);
+
+        int idIdx = name.IndexOf(StemToken, StringComparison.OrdinalIgnoreCase);
+        string idStem =
+            idIdx >= 0
+                ? name[..(idIdx + StemToken.Length)]
+                : stem;
+
+        for (int i = startIndex; i < fields.Count; i++)
+        {
+            var f = fields[i];
+            if (!LayoutUtil.IsVisible(f, ignoreFields))
+                continue;
+            if (LayoutUtil.IsBlockOpenMarker(f))
+                break;
+            if (LayoutUtil.IsBlockType(f))
+            {
+                if (clustered.Count > 0)
+                    break;
+                continue;
+            }
+
+            if (!f.FieldElement.ElementName.StartsWith(idStem, StringComparison.OrdinalIgnoreCase)
+                && !LayoutUtil.StemContains(LayoutUtil.GetStem(f.FieldElement.ElementName), StemToken))
+            {
+                if (clustered.Count > 0)
+                    break;
+                return null;
+            }
+
+            string fStem = LayoutUtil.GetStem(f.FieldElement.ElementName);
+            if (!f.FieldElement.ElementName.StartsWith(idStem + "_", StringComparison.OrdinalIgnoreCase)
+                && !f.FieldElement.ElementName.Equals(idStem, StringComparison.OrdinalIgnoreCase)
+                && !fStem.Equals(idStem, StringComparison.OrdinalIgnoreCase))
+            {
+                if (!f.FieldElement.ElementName.StartsWith(idStem, StringComparison.OrdinalIgnoreCase))
+                {
+                    if (clustered.Count > 0)
+                        break;
+                    return null;
+                }
+            }
+
+            clustered.Add(f);
+        }
+
+        if (clustered.Count < 2)
+            return null;
+
+        return new FieldGroupMatch
+        {
+            Fields = clustered,
+            Stem = idStem,
+            TemplateName = TemplateName,
+        };
+    }
+
+    public int Layout(Block block, FieldGroupMatch match, int baseX, int y, int maxWidth, HashSet<string> ignoreFields)
+    {
+        var fields = match.Fields.Where(f => LayoutUtil.IsVisible(f, ignoreFields)).ToList();
+        return LayoutIdentityCardFields(block, fields, baseX, y, maxWidth, ignoreFields);
+    }
+
+    public static int LayoutIdentityCardFields(
+        Block block,
+        List<Data> fields,
+        int baseX,
+        int y,
+        int maxWidth,
+        HashSet<string>? ignoreFields = null
+    )
+    {
+        ignoreFields ??= [];
+        if (TemplateLayoutStore.HasOverrides(TemplateName))
+        {
+            var slots = new IdentityCardFieldGroupTemplate().GetPreviewSlots(ignoreFields);
+            var idOnly = fields
+                .Where(f => IdentityCardFieldGroupTemplate.IsIdentityCardField(f.FieldElement.ElementName))
+                .ToList();
+            return TemplateSlotLayout.Apply(block, idOnly, slots, baseX, y, maxWidth);
+        }
+
+        Data? Find(string suffix) => LayoutUtil.FindBySuffix(fields, suffix);
+
+        // Alta Soft: Code | Name | Series | Number | Date | CountryCode on one row
+        y = LayoutUtil.PlaceCompactRow(
+            block,
+            [
+                (Find("IdentityCardCode"), 24),
+                (Find("IdentityCardName"), 124),
+                (Find("IdentityCardSeries"), 92),
+                (Find("IdentityCardNumber"), 204),
+                (Find("IdentityCardDate"), 84),
+                (Find("CountryCode"), 20),
+            ],
+            baseX,
+            y,
+            maxWidth
+        );
+
+        y = LayoutUtil.PlaceCompactRow(
+            block,
+            [
+                (Find("OrganizationName"), Math.Min(544, maxWidth - 220)),
+                (Find("IssuerCode"), 60),
+                (Find("AuthorityId"), 148),
+            ],
+            baseX,
+            y,
+            maxWidth
+        );
+
+        y = LayoutUtil.PlaceCompactRow(
+            block,
+            [
+                (Find("FullIdentityCardName"), Math.Min(248, maxWidth - 8)),
+                (Find("DocValidityDate"), 84),
+            ],
+            baseX,
+            y,
+            maxWidth
+        );
+
+        var known = new HashSet<string>(Suffixes, StringComparer.OrdinalIgnoreCase);
+        var extra = fields
+            .Where(f => !known.Contains(LayoutUtil.GetLastToken(f.FieldElement.ElementName)))
+            .ToList();
+        if (extra.Count > 0)
+            y = LayoutUtil.LayoutFlowRow(block, extra, baseX, y, maxWidth);
+
+        return y;
+    }
+
+    public IReadOnlyList<TemplateSlot> GetDefaultPreviewSlots(HashSet<string> ignoreFields) =>
+        AddressFieldGroupTemplate.CompactRows(
+            [
+                [
+                    ("IdentityCardCode", 24),
+                    ("IdentityCardName", 124),
+                    ("IdentityCardSeries", 92),
+                    ("IdentityCardNumber", 204),
+                    ("IdentityCardDate", 84),
+                    ("CountryCode", 20),
+                ],
+                [("OrganizationName", 544), ("IssuerCode", 60), ("AuthorityId", 148)],
+                [("FullIdentityCardName", 248), ("DocValidityDate", 84)],
+            ],
+            ignoreFields,
+            TemplateName
+        );
+
+    public IReadOnlyList<TemplateSlot> GetPreviewSlots(HashSet<string> ignoreFields) =>
+        TemplateLayoutStore.ApplyOverrides(Name, GetDefaultPreviewSlots(ignoreFields));
+
+    public static bool IsIdentityCardField(string elementName) =>
+        elementName.Contains(StemToken, StringComparison.OrdinalIgnoreCase);
+}

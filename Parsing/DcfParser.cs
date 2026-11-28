@@ -68,13 +68,77 @@ internal static class DcfParser
         if (IsBuiltInServiceField(elementName))
             return true;
 
-        if (ignoreFields.Count == 0)
+        return GetUserIgnoreMatch(elementName, ignoreFields) is not null;
+    }
+
+    public static string? GetUserIgnoreMatch(string elementName, IEnumerable<string> ignoreFields)
+    {
+        string last = GetLastToken(elementName);
+        foreach (var entry in ignoreFields)
+        {
+            if (string.IsNullOrWhiteSpace(entry))
+                continue;
+
+            if (entry.Equals(elementName, StringComparison.OrdinalIgnoreCase))
+                return entry;
+
+            if (entry.Equals(last, StringComparison.OrdinalIgnoreCase))
+                return entry;
+
+            if (IsIgnorePattern(entry) && MatchesIgnorePattern(entry, elementName))
+                return entry;
+        }
+
+        return null;
+    }
+
+    public static bool IsIgnorePattern(string entry)
+    {
+        if (string.IsNullOrWhiteSpace(entry))
             return false;
 
-        if (ignoreFields.Contains(elementName))
+        if (entry.Length >= 2 && entry[0] == '/' && entry[^1] == '/')
             return true;
 
-        return ignoreFields.Contains(GetLastToken(elementName));
+        return entry.IndexOfAny(['*', '?']) >= 0;
+    }
+
+    public static bool MatchesIgnorePattern(string pattern, string value)
+    {
+        if (string.IsNullOrEmpty(value) || string.IsNullOrWhiteSpace(pattern))
+            return false;
+
+        try
+        {
+            string regex = ToIgnoreRegex(pattern);
+            return Regex.IsMatch(value, regex, RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
+        }
+        catch (ArgumentException)
+        {
+            return false;
+        }
+    }
+
+    private static string ToIgnoreRegex(string pattern)
+    {
+        if (pattern.Length >= 2 && pattern[0] == '/' && pattern[^1] == '/')
+            return pattern[1..^1];
+
+        var sb = new StringBuilder("^");
+        foreach (char c in pattern)
+        {
+            sb.Append(
+                c switch
+                {
+                    '*' => ".*",
+                    '?' => ".",
+                    _ => Regex.Escape(c.ToString()),
+                }
+            );
+        }
+
+        sb.Append('$');
+        return sb.ToString();
     }
 
     public static string GetLastToken(string elementName)
@@ -157,13 +221,12 @@ internal static class DcfParser
             return [];
         }
 
-        // verify opening bracket exists before .Fields]
         int bracket = text.LastIndexOf('[', idx);
         if (bracket < 0)
             diagnostics.Error(DiagnosticCategory.Structure, "malformed Fields section header");
 
         string body = text[(idx + marker.Length)..];
-        // Normalize newlines
+
         var lines = body.Replace("\r\n", "\n").Replace('\r', '\n').Split('\n');
 
         List<Data> elements = [];
@@ -179,7 +242,6 @@ internal static class DcfParser
             if (string.IsNullOrWhiteSpace(item))
                 continue;
 
-            // Strip PATTERN=/NAMESPACE= for layout, but validate quotes first on original
             string original = item;
             ValidateAttributes(original, diagnostics, lineNo);
 
@@ -197,7 +259,6 @@ internal static class DcfParser
                 string name = item[..eq].Trim();
                 string value = item[(eq + 1)..].Trim();
 
-                // Detect block open on same line: Name{&&Num ...
                 if (name.Contains('{'))
                 {
                     ParseBlockOpen(name, value, ref level, stack, elements, rusName, diagnostics, lineNo);
@@ -324,7 +385,7 @@ internal static class DcfParser
     {
         if (stack.Count == 0)
             return Consts.DefaultBlockName;
-        // Top-level repeating blocks use their own name as SF2 section (Goods, InvoiceGoods)
+
         return string.Join("\\", stack.Reverse());
     }
 

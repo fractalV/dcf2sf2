@@ -6,9 +6,6 @@ namespace DcfToSf2.Parsing;
 
 internal static class XsdHints
 {
-    /// <summary>
-    /// Loads documentation labels only. Does not affect block nesting.
-    /// </summary>
     public static Dictionary<string, string> LoadLabels(FileInfo dcfFile, DcfDiagnostics diagnostics)
     {
         var labels = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
@@ -54,7 +51,6 @@ internal static class XsdHints
         string dir = dcfFile.DirectoryName ?? ".";
         string baseName = dcfFile.Name;
 
-        // COMMERCIALINVOICE.XSD.Dcf → CommercialInvoice.xsd / COMMERCIALINVOICE.xsd
         string stripped = baseName;
         if (stripped.EndsWith(".Dcf", StringComparison.OrdinalIgnoreCase))
             stripped = stripped[..^4];

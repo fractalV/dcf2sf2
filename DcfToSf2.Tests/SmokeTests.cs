@@ -57,8 +57,8 @@ public class SmokeTests
             Assert.Contains("Consignee_", text);
             Assert.Contains("Consignor_", text);
             Assert.Contains("@Container@", text);
+            Assert.Contains("Rect", text);
 
-            // Single-column: Carrier and Consignee should not share the same Y for OrganizationName
             var carrier = FindData(text, "Carrier_OrganizationName");
             var consignee = FindData(text, "Consignee_OrganizationName");
             Assert.NotNull(carrier);
@@ -122,7 +122,7 @@ public class SmokeTests
             Assert.Equal(seller!.Value.y, buyer!.Value.y);
             Assert.True(seller.Value.x < buyer.Value.x);
 
-            Assert.Contains("Line", text);
+            Assert.Contains("Rect", text);
             Assert.Contains("Pict", text);
         }
         finally
@@ -158,6 +158,20 @@ public class SmokeTests
         Assert.DoesNotContain("Carrier_Fax", rendered);
         Assert.DoesNotContain("Carrier_Telex", rendered);
         Assert.Contains("Carrier_Phone", rendered);
+    }
+
+    [Fact]
+    public void IgnoreFields_WildcardAndRegex()
+    {
+        var ignore = ConversionOptions.ParseIgnoreFields("*Fax,/.*Telex$/");
+
+        Assert.True(DcfParser.ShouldSkipField("Carrier_Fax", ignore));
+        Assert.True(DcfParser.ShouldSkipField("Seller_OrganizationFax", ignore));
+        Assert.True(DcfParser.ShouldSkipField("Carrier_Telex", ignore));
+        Assert.False(DcfParser.ShouldSkipField("Carrier_Phone", ignore));
+        Assert.True(DcfParser.IsIgnorePattern("*Fax"));
+        Assert.True(DcfParser.IsIgnorePattern("/abc/"));
+        Assert.False(DcfParser.IsIgnorePattern("Carrier_Fax"));
     }
 
     [Fact]

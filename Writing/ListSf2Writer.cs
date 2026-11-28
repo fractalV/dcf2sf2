@@ -1,5 +1,6 @@
 using System.Text;
 using System.Text.RegularExpressions;
+using DcfToSf2.Diagnostics;
 using DcfToSf2.Layout;
 using DcfToSf2.Parsing;
 
@@ -14,15 +15,15 @@ internal static class ListSf2Writer
         DirectoryInfo outputDirectory,
         DcfParseResult parsed,
         Sf2Document document,
-        ConversionOptions options
+        ConversionOptions options,
+        IConversionLog? log = null
     )
     {
+        log ??= ConsoleConversionLog.Instance;
         string path = GetPath(outputDirectory, document.DocumentName);
         if (File.Exists(path) && !options.ForceList)
         {
-            Console.ForegroundColor = ConsoleColor.DarkYellow;
-            Console.WriteLine("List уже существует (пропуск): " + path);
-            Console.ResetColor();
+            log.Warning("List уже существует (пропуск): " + path);
             return;
         }
 
@@ -32,9 +33,7 @@ internal static class ListSf2Writer
         foreach (var line in lines)
             sw.WriteLine(line);
 
-        Console.ForegroundColor = ConsoleColor.Green;
-        Console.WriteLine("Файл List записан: " + path);
-        Console.ResetColor();
+        log.Success("Файл List записан: " + path);
     }
 
     public static List<string> Render(DcfParseResult parsed, Sf2Document document)
